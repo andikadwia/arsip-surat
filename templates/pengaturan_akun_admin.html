@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DigiSurat – Profil Admin</title>
+  <meta name="description" content="Pengaturan Akun & Profil Admin DigiSurat">
+  <link rel="stylesheet" href="../static/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    /* === IDENTIK dengan pengaturan_akun.html (karyawan) === */
+    .profil-wrap {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    /* ---- Header profil ---- */
+    .profil-header {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 28px 22px;
+      border-bottom: 1px solid var(--border);
+      background: #fff;
+    }
+    .hak-akses-label {
+      position: absolute;
+      top: 14px; right: 18px;
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .profil-avatar-wrap {
+      position: relative;
+      width: 80px; height: 80px;
+      margin-bottom: 12px;
+    }
+    .profil-avatar-wrap img {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid #ddd;
+    }
+    .avatar-cam-btn {
+      position: absolute; bottom: 0; right: 0;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      border: 2px solid #fff;
+      font-size: 0.64rem;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .profil-name { font-size: 1.05rem; font-weight: 700; margin-bottom: 2px; }
+    .profil-sub { font-size: 0.8rem; color: var(--text-secondary); }
+
+    /* ---- Tabs ---- */
+    .profil-tabs {
+      display: flex;
+      border-bottom: 2px solid var(--border);
+      background: #fff;
+    }
+    .profil-tab-btn {
+      flex: 1; padding: 12px 16px;
+      font-size: 0.87rem; font-weight: 600;
+      color: var(--text-secondary);
+      border: none; background: none; cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .profil-tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .profil-tab-btn:hover:not(.active) { color: var(--text-primary); }
+
+    /* ---- Tab panes ---- */
+    .tab-pane { display: none; padding: 24px 28px; }
+    .tab-pane.active { display: block; }
+
+    /* Info fields */
+    .info-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 28px; }
+    .info-field label {
+      display: block; font-size: 0.78rem; font-weight: 600;
+      color: var(--text-secondary); margin-bottom: 5px;
+    }
+    .info-value-box {
+      display: flex; align-items: center; gap: 9px;
+      background: var(--border-light); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 8px 13px;
+      font-size: 0.88rem; color: var(--text-primary);
+    }
+    .info-value-box i { color: var(--text-muted); font-size: 0.8rem; }
+
+    /* Mini stats */
+    .mini-stats-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+    .mini-stat-box {
+      background: var(--border-light); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 12px; text-align: center;
+    }
+    .mini-stat-box .ms-lbl { font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 10px; }
+    .mini-stat-box .ms-val { font-size: 1.3rem; font-weight: 800; }
+
+    /* Activity table */
+    .act-tbl { width: 100%; border-collapse: collapse; }
+    .act-tbl th {
+      padding: 10px 14px; font-size: 0.78rem; font-weight: 600;
+      color: var(--text-secondary); text-transform: uppercase;
+      letter-spacing: 0.04em; border-bottom: 1px solid var(--border);
+      text-align: left; background: transparent;
+    }
+    .act-tbl td {
+      padding: 12px 14px; font-size: 0.86rem;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .act-tbl tr:last-child td { border-bottom: none; }
+    .status-badge {
+      display: inline-block; padding: 3px 12px; border-radius: 20px;
+      font-size: 0.75rem; font-weight: 600;
+    }
+    .sb-selesai { background: #dcfce7; color: #166534; }
+    .sb-sukses  { background: #dcfce7; color: #166534; }
+    .sb-info    { background: #dbeafe; color: #1e40af; }
+
+    /* Security card */
+    .security-card {
+      background: #fff; border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 24px 28px; margin-bottom: 20px;
+    }
+    .sec-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 0; border-bottom: 1px solid var(--border-light);
+    }
+    .sec-row:last-child { border-bottom: none; }
+    .sec-row-info .sec-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 2px; }
+    .sec-row-info .sec-sub   { font-size: 0.78rem; color: var(--text-secondary); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- SIDEBAR — Admin: 7 menu item -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div style="width:36px;height:36px;background:#253044;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="fa-solid fa-envelope-open-text" style="color:#60a5fa;font-size:1rem;"></i>
+      </div>
+      <span class="brand-name">Digi<span>Surat</span></span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard_admin.html" class="nav-item">
+        <i class="nav-icon fa-solid fa-table-cells-large"></i><span>Dashboard</span>
+      </a>
+      <a href="manajemen_surat.html" class="nav-item">
+        <i class="nav-icon fa-regular fa-folder-open"></i><span>Manajemen Surat</span>
+      </a>
+      <a href="kategori_surat.html" class="nav-item">
+        <i class="nav-icon fa-solid fa-tags"></i><span>Kategori Surat</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <h1 class="topbar-title">Pengaturan Akun</h1>
+    <div class="topbar-right">
+      <div style="position:relative;">
+        <button class="user-menu-btn" id="userMenuBtn" onclick="toggleDropdown()">
+          <img src="https://ui-avatars.com/api/?name=Admin&background=3b82f6&color=fff&size=72"
+              alt="Avatar Admin" class="user-avatar" id="topbarAvatar">
+          <span id="topbarName">Admin</span>
+          <i class="fa-solid fa-chevron-down chevron"></i>
+        </button>
+        <div class="dropdown-menu" id="dropdownMenu">
+          <a href="pengaturan_akun_admin.html"><i class="fa-regular fa-user"></i> Profil Saya</a>
+          <a href="#" onclick="openGantiSandi()"><i class="fa-solid fa-key"></i> Ganti Sandi</a>
+          <div class="dropdown-divider"></div>
+          <button class="logout-btn" onclick="handleLogout()">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- ======= CARD 1: INFO AKUN ======= -->
+    <div class="profil-wrap">
+
+      <!-- Header: avatar, nama, role -->
+      <div class="profil-header">
+        <span class="hak-akses-label">Hak Akses: Admin</span>
+
+        <div class="profil-avatar-wrap">
+          <img src="https://ui-avatars.com/api/?name=Admin&background=3b82f6&color=fff&size=160"
+               alt="Avatar Admin" id="profileAvatar">
+          <label class="avatar-cam-btn" for="avatarInput" title="Ganti foto">
+            <i class="fa-solid fa-camera"></i>
+            <input type="file" id="avatarInput" accept="image/*" style="display:none;" onchange="changeAvatar(this)">
+          </label>
+        </div>
+
+        <div class="profil-name" id="profileName">Admin</div>
+        <div class="profil-sub">Pengguna Sistem Pengarsipan Surat Digital DigiSurat</div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="profil-tabs">
+        <button class="profil-tab-btn active" id="tabInfoBtn" onclick="switchTab('info')">
+          <i class="fa-regular fa-user"></i> Informasi Akun
+        </button>
+        <button class="profil-tab-btn" id="tabAktivitasBtn" onclick="switchTab('aktivitas')">
+          <i class="fa-regular fa-clock"></i> Riwayat Aktivitas
+        </button>
+      </div>
+
+      <!-- TAB: INFORMASI AKUN -->
+      <div class="tab-pane active" id="tabInfo">
+        <div class="info-row-2">
+          <div class="info-field">
+            <label>Nama Lengkap</label>
+            <div class="info-value-box">
+              <i class="fa-regular fa-user"></i>
+              <span id="infoNama">Admin</span>
+            </div>
+          </div>
+          <div class="info-field">
+            <label>Alamat Email Kampus</label>
+            <div class="info-value-box">
+              <i class="fa-regular fa-envelope"></i>
+              <span id="infoEmail">admin@polibatam.ac.id</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mini Stats — versi Admin -->
+        <div class="mini-stats-3">
+          <div class="mini-stat-box">
+            <div class="ms-lbl">Surat Dikelola</div>
+            <div class="ms-val" id="adminStatSurat">0</div>
+          </div>
+          <div class="mini-stat-box">
+            <div class="ms-lbl">Total User</div>
+            <div class="ms-val" id="adminStatUser">0</div>
+          </div>
+          <div class="mini-stat-box">
+            <div class="ms-lbl">Akurasi Tertinggi</div>
+            <div class="ms-val">82%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: RIWAYAT AKTIVITAS -->
+      <div class="tab-pane" id="tabAktivitas">
+        <table class="act-tbl">
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Kegiatan</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>15 Apr 2026, 07:00</td>
+              <td>Login ke Sistem</td>
+              <td><span class="status-badge sb-sukses">Sukses</span></td>
+            </tr>
+            <tr>
+              <td>14 Apr 2026, 16:30</td>
+              <td>Mengunggah Surat Baru</td>
+              <td><span class="status-badge sb-selesai">Selesai</span></td>
+            </tr>
+            <tr>
+              <td>14 Apr 2026, 15:00</td>
+              <td>Mengelola Manajemen User</td>
+              <td><span class="status-badge sb-selesai">Selesai</span></td>
+            </tr>
+            <tr>
+              <td>13 Apr 2026, 10:20</td>
+              <td>Melihat Laporan Arsip</td>
+              <td><span class="status-badge sb-info">Info</span></td>
+            </tr>
+            <tr>
+              <td>12 Apr 2026, 09:00</td>
+              <td>Menjalankan Pelatihan Model AI</td>
+              <td><span class="status-badge sb-sukses">Sukses</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <a href="#" class="see-all-link"
+           onclick="showToast('Menampilkan semua aktivitas','info');return false;">
+          Lihat semua
+        </a>
+      </div>
+    </div>
+
+    <!-- ======= CARD 2: KEAMANAN AKUN ======= -->
+    <div class="security-card">
+      <h2 style="font-size:0.95rem;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+        <i class="fa-solid fa-shield-halved" style="color:var(--accent);"></i> Keamanan Akun
+      </h2>
+      <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:16px;">
+        Kelola password dan sesi login Anda
+      </p>
+      <div class="sec-row">
+        <div class="sec-row-info">
+          <div class="sec-title">Password</div>
+          <div class="sec-sub">Terakhir diubah: 01 Jan 2026</div>
+        </div>
+        <button class="btn btn-outline" onclick="openGantiSandi()">
+          <i class="fa-solid fa-lock"></i> Ganti Sandi
+        </button>
+      </div>
+      <div class="sec-row">
+        <div class="sec-row-info">
+          <div class="sec-title">Edit Profil</div>
+          <div class="sec-sub">Ubah nama dan email akun Anda</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('editProfilModal')">
+          <i class="fa-solid fa-pen-to-square"></i> Edit Profil
+        </button>
+      </div>
+      <div class="sec-row">
+        <div class="sec-row-info">
+          <div class="sec-title">Sesi Aktif</div>
+          <div class="sec-sub">1 sesi aktif saat ini</div>
+        </div>
+        <button class="btn btn-outline" style="color:var(--danger);border-color:var(--danger);"
+                onclick="handleLogout()">
+          <i class="fa-solid fa-right-from-bracket"></i> Keluar Semua
+        </button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL EDIT PROFIL -->
+<div class="modal-overlay" id="editProfilModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title"><i class="fa-solid fa-pen-to-square"></i> Edit Profil</span>
+      <button class="modal-close" onclick="closeModal('editProfilModal')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nama Lengkap</label>
+      <input type="text" class="form-control" id="editProfilNama" placeholder="Nama lengkap">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-control" id="editProfilEmail" placeholder="email@polibatam.ac.id">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeModal('editProfilModal')">Batal</button>
+      <button class="btn btn-primary" onclick="submitEditProfil()">
+        <i class="fa-solid fa-save"></i> Simpan
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GANTI SANDI -->
+<div class="modal-overlay" id="gantiSandiModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title"><i class="fa-solid fa-key"></i> Ganti Password</span>
+      <button class="modal-close" onclick="closeModal('gantiSandiModal')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password Lama</label>
+      <div class="pass-input-wrap">
+        <input type="password" class="form-control" id="oldPass" placeholder="••••••••">
+        <button type="button" class="pass-eye-btn" onclick="togglePassField('oldPass',this)">
+          <i class="fa-solid fa-eye"></i>
+        </button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password Baru</label>
+      <div class="pass-input-wrap">
+        <input type="password" class="form-control" id="newPass" placeholder="••••••••"
+               oninput="checkStrength(this.value)">
+        <button type="button" class="pass-eye-btn" onclick="togglePassField('newPass',this)">
+          <i class="fa-solid fa-eye"></i>
+        </button>
+      </div>
+      <div class="password-strength" id="passStrengthBar"></div>
+      <div id="passStrengthLabel" style="font-size:0.75rem;color:var(--text-muted);margin-top:3px;"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Konfirmasi Password Baru</label>
+      <div class="pass-input-wrap">
+        <input type="password" class="form-control" id="confirmPass" placeholder="••••••••">
+        <button type="button" class="pass-eye-btn" onclick="togglePassField('confirmPass',this)">
+          <i class="fa-solid fa-eye"></i>
+        </button>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeModal('gantiSandiModal')">Batal</button>
+      <button class="btn btn-primary" onclick="submitGantiSandi()">
+        <i class="fa-solid fa-save"></i> Simpan
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LOGOUT -->
+<div class="modal-overlay" id="logoutModal">
+  <div class="modal" style="max-width:380px;">
+    <div class="confirm-icon"><i class="fa-solid fa-right-from-bracket"></i></div>
+    <div class="confirm-text">
+      <h3>Konfirmasi Logout</h3>
+      <p>Apakah Anda yakin ingin keluar dari sistem?</p>
+    </div>
+    <div class="form-actions" style="justify-content:center;">
+      <button class="btn btn-outline" onclick="closeModal('logoutModal')">Batal</button>
+      <button class="btn btn-danger" onclick="confirmLogout()">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="../static/data.js"></script>
+<script src="../static/app.js"></script>
+<script>
+  initPage('pengaturan-akun-admin');
+
+  // Isi stats dari data
+  document.getElementById('adminStatSurat').textContent = getLetters().length;
+  document.getElementById('adminStatUser').textContent  = getUsers().length;
+
+  // Pre-fill modal edit
+  document.getElementById('editProfilNama').value  = 'Admin';
+  document.getElementById('editProfilEmail').value = 'admin@polibatam.ac.id';
+
+  function switchTab(tab) {
+    document.getElementById('tabInfo').classList.toggle('active', tab === 'info');
+    document.getElementById('tabAktivitas').classList.toggle('active', tab === 'aktivitas');
+    document.getElementById('tabInfoBtn').classList.toggle('active', tab === 'info');
+    document.getElementById('tabAktivitasBtn').classList.toggle('active', tab === 'aktivitas');
+  }
+
+  function changeAvatar(input) {
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        document.getElementById('profileAvatar').src = e.target.result;
+        document.getElementById('topbarAvatar').src  = e.target.result;
+        showToast('Foto profil berhasil diperbarui!', 'success');
+      };
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  function submitEditProfil() {
+    const nama  = document.getElementById('editProfilNama').value.trim();
+    const email = document.getElementById('editProfilEmail').value.trim();
+    if (!nama || !email) { showToast('Harap isi semua field!', 'error'); return; }
+    document.getElementById('profileName').textContent = nama;
+    document.getElementById('infoNama').textContent    = nama;
+    document.getElementById('infoEmail').textContent   = email;
+    document.getElementById('topbarName').textContent  = nama;
+    closeModal('editProfilModal');
+    showToast('Profil berhasil diperbarui!', 'success');
+  }
+</script>
+</body>
+</html>

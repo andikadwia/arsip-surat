@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DigiSurat – Login</title>
+  <meta name="description" content="Login ke Sistem Pengarsipan Surat Digital DigiSurat">
+  <link rel="stylesheet" href="../static/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    .login-page { background: linear-gradient(135deg, #1a2332 0%, #253044 50%, #1e3a5f 100%); }
+    .login-card { animation: fadeUp 0.4s ease both; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .role-selector { display: flex; gap: 8px; margin-bottom: 22px; }
+    .role-btn {
+      flex: 1; padding: 9px; border-radius: 6px; border: 1.5px solid var(--border);
+      background: transparent; font-size: 0.85rem; font-weight: 600;
+      color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+    }
+    .role-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .role-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-logo">
+        <div style="width:44px;height:44px;background:#1a2332;border-radius:10px;display:flex;align-items:center;justify-content:center;">
+          <i class="fa-solid fa-envelope-open-text" style="color:#60a5fa;font-size:1.2rem;"></i>
+        </div>
+        <div class="brand">Digi<span>Surat</span></div>
+      </div>
+      <p class="login-subtitle">Sistem Pengarsipan Surat Digital</p>
+
+      <div class="role-selector">
+        <button class="role-btn active" id="roleAdminBtn" onclick="setRole('admin')">
+          <i class="fa-solid fa-user-shield"></i> Admin
+        </button>
+        <button class="role-btn" id="roleKaryawanBtn" onclick="setRole('karyawan')">
+          <i class="fa-solid fa-user"></i> Karyawan
+        </button>
+      </div>
+
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <div class="pass-input-wrap">
+            <input type="email" class="form-control" id="emailInput" placeholder="email@polibatam.ac.id" required>
+            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:0.85rem;">
+            </span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <div class="pass-input-wrap">
+            <input type="password" class="form-control" id="passwordInput" placeholder="••••••••" required>
+            <button type="button" class="pass-eye-btn" id="eyeBtn" onclick="togglePass()">
+              <i class="fa-solid fa-eye" id="eyeIcon"></i>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px;" id="loginBtn">
+          <i class="fa-solid fa-right-to-bracket"></i> Masuk
+        </button>
+      </form>
+
+      <div class="login-footer">
+        Sistem Pengarsipan Surat Digital &copy; 2026 Politeknik Batam
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    let selectedRole = 'admin';
+
+    function setRole(role) {
+      selectedRole = role;
+      document.getElementById('roleAdminBtn').classList.toggle('active', role === 'admin');
+      document.getElementById('roleKaryawanBtn').classList.toggle('active', role === 'karyawan');
+    }
+
+    function togglePass() {
+      const inp = document.getElementById('passwordInput');
+      const icon = document.getElementById('eyeIcon');
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.className = 'fa-solid fa-eye-slash';
+      } else {
+        inp.type = 'password';
+        icon.className = 'fa-solid fa-eye';
+      }
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Masuk';
+        if (selectedRole === 'admin') {
+          window.location.href = 'dashboard_admin.html';
+        } else {
+          window.location.href = 'dashboard_karyawan.html';
+        }
+      }, 900);
+    }
+
+    function showToast(msg, type = 'info') {
+      const c = document.getElementById('toastContainer');
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.innerHTML = `<i class="fa-solid fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle'}"></i> ${msg}`;
+      c.appendChild(t);
+      setTimeout(() => { t.classList.add('fade-out'); setTimeout(() => t.remove(), 350); }, 3000);
+    }
+  </script>
+</body>
+</html>
