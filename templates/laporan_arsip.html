@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DigiSurat - Laporan Arsip</title>
+  <meta name="description" content="Halaman cetak dan unduh laporan arsip surat DigiSurat">
+  <link rel="stylesheet" href="../static/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    .filter-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.1fr auto;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    .filter-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .filter-group input,
+    .filter-group select {
+      width: 100%;
+      height: 40px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0 12px;
+      font-size: 0.88rem;
+      outline: none;
+      background: #fff;
+    }
+
+    .btn-show {
+      height: 40px;
+      border: 1.5px solid var(--border);
+      background: var(--card-bg);
+      border-radius: var(--radius-sm);
+      padding: 0 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .preview-header h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .export-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn-export {
+      height: 34px;
+      border: none;
+      border-radius: 8px;
+      color: #111827;
+      padding: 0 18px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .btn-export.excel { background: #22c55e; }
+    .btn-export.pdf { background: #f87171; }
+
+    @media (max-width: 980px) {
+      .filter-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .filter-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div style="width:36px;height:36px;background:#253044;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="fa-solid fa-envelope-open-text" style="color:#60a5fa;font-size:1rem;"></i>
+      </div>
+      <span class="brand-name">Digi<span>Surat</span></span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard_admin.html" class="nav-item"><i class="nav-icon fa-solid fa-table-cells-large"></i><span>Dashboard</span></a>
+      <a href="manajemen_surat.html" class="nav-item"><i class="nav-icon fa-regular fa-folder-open"></i><span>Manajemen Surat</span></a>
+      <a href="kategori_surat.html" class="nav-item"><i class="nav-icon fa-solid fa-tags"></i><span>Kategori Surat</span></a>
+      <a href="perbandingan_algoritma.html" class="nav-item"><i class="nav-icon fa-solid fa-chart-column"></i><span>Perbandingan Algoritma</span></a>
+      <a href="laporan_arsip.html" class="nav-item active"><i class="nav-icon fa-regular fa-file-lines"></i><span>Laporan Arsip</span></a>
+      <a href="manajemen_user.html" class="nav-item"><i class="nav-icon fa-solid fa-users"></i><span>Manajemen User</span></a>
+      <a href="pengaturan_ai.html" class="nav-item"><i class="nav-icon fa-solid fa-gear"></i><span>Pengaturan AI</span></a>
+    </nav>
+  </aside>
+
+  <header class="topbar">
+    <h1 class="topbar-title">Cetak dan Unduh Laporan</h1>
+    <div class="topbar-right">
+      <div style="position:relative;">
+        <button class="user-menu-btn" id="userMenuBtn" onclick="toggleDropdown()">
+          <img src="https://ui-avatars.com/api/?name=Admin&background=3b82f6&color=fff&size=72" alt="Avatar Admin" class="user-avatar">
+          Admin
+          <i class="fa-solid fa-chevron-down chevron"></i>
+        </button>
+        <div class="dropdown-menu" id="dropdownMenu">
+          <a href="pengaturan_akun_admin.html"><i class="fa-regular fa-user"></i> Profil Saya</a>
+          <a href="#" onclick="openGantiSandi()"><i class="fa-solid fa-key"></i> Ganti Sandi</a>
+          <div class="dropdown-divider"></div>
+          <button class="logout-btn" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <section class="filter-row">
+      <div class="filter-group">
+        <label for="tanggalMulai">Dari tanggal</label>
+        <input id="tanggalMulai" type="text" placeholder="hh/bb/tttt">
+      </div>
+      <div class="filter-group">
+        <label for="tanggalSampai">Sampai tanggal</label>
+        <input id="tanggalSampai" type="text" placeholder="hh/bb/tttt">
+      </div>
+      <div class="filter-group">
+        <label for="kategoriLaporan">Kategori Surat</label>
+        <select id="kategoriLaporan">
+          <option>Semua Kategori</option>
+          <option>Undangan</option>
+          <option>Pemberitahuan</option>
+          <option>Keputusan</option>
+          <option>Edaran</option>
+        </select>
+      </div>
+      <button class="btn-show"><i class="fa-solid fa-magnifying-glass"></i> Tampilkan Data</button>
+    </section>
+
+    <section>
+      <div class="preview-header">
+        <h2>Preview Laporan Arsip</h2>
+        <div class="export-actions">
+          <button class="btn-export excel"><i class="fa-regular fa-file-excel"></i> Export Excel</button>
+          <button class="btn-export pdf"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel-title">Daftar Arsip Surat</h3>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Nomor Surat</th>
+                <th>Tanggal Surat</th>
+                <th>Pengirim</th>
+                <th>Perihal</th>
+                <th>Kategori</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>420/123/Disdik-SB/IV/2026</td>
+                <td>10-04-2026</td>
+                <td>Dinas Pendidikan Sumatera Barat</td>
+                <td>Undangan Rapat Koordinasi Pendidikan</td>
+                <td>Undangan</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <a href="manajemen_surat.html" class="see-all-link">Lihat Semua</a>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="../static/data.js"></script>
+<script src="../static/app.js"></script>
+<script>
+  initPage('laporan-arsip');
+</script>
+</body>
+</html>

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DigiSurat - Perbandingan Algoritma</title>
+  <meta name="description" content="Halaman perbandingan performa algoritma Naive Bayes dan KNN">
+  <link rel="stylesheet" href="../static/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    .hero-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 22px 18px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .hero-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .hero-subtitle {
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .hero-desc {
+      color: var(--text-secondary);
+      font-size: 0.98rem;
+    }
+
+    .btn-refresh {
+      border: 1px solid #111827;
+      background: #fff;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      padding: 8px 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .comparison-panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 24px 20px 18px;
+    }
+
+    .panel-heading {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.85rem;
+      margin-bottom: 20px;
+    }
+
+    .panel-heading i {
+      font-size: 1.85rem;
+    }
+
+    .algo-legend-wide {
+      display: flex;
+      justify-content: center;
+      gap: 70px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+
+    .algo-label {
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #111827;
+    }
+
+    .swatch {
+      width: 96px;
+      height: 18px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .swatch.nb {
+      background: #253140;
+    }
+
+    .swatch.knn {
+      background: #53647a;
+    }
+
+    .chart-wrap {
+      margin: 0 auto;
+      max-width: 940px;
+      border-bottom: 2px solid #111827;
+      border-left: 2px solid #111827;
+      height: 400px;
+      position: relative;
+      padding: 16px 24px 0 46px;
+      background-image: repeating-linear-gradient(
+        to top,
+        #f3f4f6 0,
+        #f3f4f6 1px,
+        transparent 1px,
+        transparent 10%
+      );
+      background-size: 100% 100%;
+    }
+
+    .y-axis-labels {
+      position: absolute;
+      left: -38px;
+      top: 8px;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .metric-grid {
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+    }
+
+    .metric-group {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      position: relative;
+      padding-bottom: 44px;
+      border-right: 1px solid #cbd5e1;
+    }
+
+    .metric-group:last-child {
+      border-right: none;
+    }
+
+    .bar-pair {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 14px;
+      height: 100%;
+    }
+
+    .bar {
+      width: 26px;
+      border-radius: 8px 8px 0 0;
+      position: relative;
+    }
+
+    .bar-value {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: -24px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .bar.nb {
+      background: #253140;
+    }
+
+    .bar.knn {
+      background: #53647a;
+    }
+
+    .metric-name {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1rem;
+      font-weight: 600;
+      white-space: nowrap;
+      color: #111827;
+    }
+
+    .conclusion-title {
+      text-align: center;
+      font-size: 1.9rem;
+      margin: 28px 0 16px;
+      font-weight: 500;
+    }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 22px;
+      margin-bottom: 16px;
+    }
+
+    .summary-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .summary-card h3 {
+      font-size: 1.35rem;
+      font-weight: 500;
+    }
+
+    .summary-card .value {
+      font-size: 2rem;
+      font-weight: 500;
+      color: #111827;
+    }
+
+    .note {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      background: #fff;
+      padding: 12px 14px;
+      font-size: 0.9rem;
+      color: #111827;
+      text-align: center;
+    }
+
+    @media (max-width: 1200px) {
+      .hero-title { font-size: 1.5rem; }
+      .hero-subtitle { font-size: 1.25rem; }
+      .hero-desc { font-size: 0.92rem; }
+      .panel-heading { font-size: 1.55rem; }
+      .algo-label { font-size: 1.15rem; }
+      .swatch { width: 88px; height: 20px; }
+      .chart-wrap { height: 340px; }
+      .y-axis-labels { font-size: 0.75rem; left: -32px; }
+      .metric-name { font-size: 1rem; }
+      .conclusion-title { font-size: 1.7rem; }
+      .summary-card h3 { font-size: 1.4rem; }
+      .summary-card .value { font-size: 2rem; }
+    }
+
+    @media (max-width: 760px) {
+      .main-content { padding: 16px; }
+      .summary-cards { grid-template-columns: 1fr; }
+      .chart-wrap {
+        overflow-x: auto;
+        padding-right: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div style="width:36px;height:36px;background:#253044;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="fa-solid fa-envelope-open-text" style="color:#60a5fa;font-size:1rem;"></i>
+      </div>
+      <span class="brand-name">Digi<span>Surat</span></span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard_admin.html" class="nav-item"><i class="nav-icon fa-solid fa-table-cells-large"></i><span>Dashboard</span></a>
+      <a href="manajemen_surat.html" class="nav-item"><i class="nav-icon fa-regular fa-folder-open"></i><span>Manajemen Surat</span></a>
+      <a href="kategori_surat.html" class="nav-item"><i class="nav-icon fa-solid fa-tags"></i><span>Kategori Surat</span></a>
+      <a href="perbandingan_algoritma.html" class="nav-item active"><i class="nav-icon fa-solid fa-chart-column"></i><span>Perbandingan Algoritma</span></a>
+      <a href="laporan_arsip.html" class="nav-item"><i class="nav-icon fa-regular fa-file-lines"></i><span>Laporan Arsip</span></a>
+      <a href="manajemen_user.html" class="nav-item"><i class="nav-icon fa-solid fa-users"></i><span>Manajemen User</span></a>
+      <a href="pengaturan_ai.html" class="nav-item"><i class="nav-icon fa-solid fa-gear"></i><span>Pengaturan AI</span></a>
+    </nav>
+  </aside>
+
+  <header class="topbar">
+    <h1 class="topbar-title">Analisis Performa AI</h1>
+    <div class="topbar-right">
+      <div style="position:relative;">
+        <button class="user-menu-btn" id="userMenuBtn" onclick="toggleDropdown()">
+          <img src="https://ui-avatars.com/api/?name=Admin&background=3b82f6&color=fff&size=72" alt="Avatar Admin" class="user-avatar">
+          Admin
+          <i class="fa-solid fa-chevron-down chevron"></i>
+        </button>
+        <div class="dropdown-menu" id="dropdownMenu">
+          <a href="pengaturan_akun_admin.html"><i class="fa-regular fa-user"></i> Profil Saya</a>
+          <button class="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <section class="hero-card">
+      <div>
+        <h2 class="hero-subtitle">Perbandingan Naive Bayes &amp; K-Nearest Neighbour</h2>
+        <p class="hero-desc">Visualisasi hasil evaluasi model berdasarkan dataset arsip surat.</p>
+      </div>
+      <button class="btn-refresh"><i class="fa-solid fa-rotate-right"></i> Segarkan</button>
+    </section>
+
+    <section class="comparison-panel">
+      <h2 class="panel-heading"><i class="fa-solid fa-chart-line"></i> Grafik Metrik Evaluasi</h2>
+
+      <div class="algo-legend-wide">
+        <div class="algo-label">Naive Bayes <span class="swatch nb"></span></div>
+        <div class="algo-label">K-Nearest Neighbour <span class="swatch knn"></span></div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="y-axis-labels">
+          <span>100%</span>
+          <span>90%</span>
+          <span>80%</span>
+          <span>70%</span>
+          <span>60%</span>
+          <span>50%</span>
+          <span>40%</span>
+          <span>30%</span>
+          <span>20%</span>
+          <span>10%</span>
+          <span>0%</span>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric-group">
+            <div class="bar-pair">
+              <div class="bar nb" style="height:83%;"><span class="bar-value">83%</span></div>
+              <div class="bar knn" style="height:87%;"><span class="bar-value">87%</span></div>
+            </div>
+            <div class="metric-name">Akurasi</div>
+          </div>
+          <div class="metric-group">
+            <div class="bar-pair">
+              <div class="bar nb" style="height:90%;"><span class="bar-value">90%</span></div>
+              <div class="bar knn" style="height:85%;"><span class="bar-value">85%</span></div>
+            </div>
+            <div class="metric-name">Precision</div>
+          </div>
+          <div class="metric-group">
+            <div class="bar-pair">
+              <div class="bar nb" style="height:93%;"><span class="bar-value">93%</span></div>
+              <div class="bar knn" style="height:96%;"><span class="bar-value">96%</span></div>
+            </div>
+            <div class="metric-name">Recall</div>
+          </div>
+          <div class="metric-group">
+            <div class="bar-pair">
+              <div class="bar nb" style="height:80%;"><span class="bar-value">80%</span></div>
+              <div class="bar knn" style="height:93%;"><span class="bar-value">93%</span></div>
+            </div>
+            <div class="metric-name">F1-score</div>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="conclusion-title">Kesimpulan Performa</h3>
+
+      <div class="summary-cards">
+        <article class="summary-card">
+          <h3>Algoritma Naive Bayes</h3>
+          <div class="value">82,5%</div>
+        </article>
+        <article class="summary-card">
+          <h3>Algoritma KNN</h3>
+          <div class="value">85%</div>
+        </article>
+      </div>
+
+      <p class="note">*Berdasarkan data saat ini, K-NN memiliki performa pengarsipan sedikit lebih baik.</p>
+    </section>
+  </main>
+</div>
+
+<script>
+  function toggleDropdown() {
+    document.getElementById('dropdownMenu').classList.toggle('open');
+  }
+
+  document.addEventListener('click', function (event) {
+    const menu = document.getElementById('dropdownMenu');
+    const btn = document.getElementById('userMenuBtn');
+    if (!btn.contains(event.target) && !menu.contains(event.target)) {
+      menu.classList.remove('open');
+    }
+  });
+</script>
+</body>
+</html>

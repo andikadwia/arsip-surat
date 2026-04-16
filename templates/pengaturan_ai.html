@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DigiSurat - Pengaturan AI</title>
+  <meta name="description" content="Halaman tuning dan pengaturan kecerdasan buatan DigiSurat">
+  <link rel="stylesheet" href="../static/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    .ai-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      margin-bottom: 16px;
+    }
+
+    .ai-card h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .engine-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .engine-meta {
+      font-size: 0.92rem;
+      color: var(--text-primary);
+      line-height: 1.7;
+    }
+
+    .engine-meta .muted {
+      color: var(--text-secondary);
+      font-size: 0.86rem;
+    }
+
+    .train-box {
+      min-width: 240px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+    }
+
+    .upload-inline {
+      width: 100%;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .upload-inline input[type='file'] {
+      width: 100%;
+      font-size: 0.83rem;
+    }
+
+    .btn-train {
+      background: #f59e0b;
+      color: #111827;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.86rem;
+      height: 34px;
+      padding: 0 14px;
+    }
+
+    .preprocess-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: end;
+    }
+
+    .field-label {
+      display: block;
+      font-size: 0.86rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+
+    .field-control {
+      width: 100%;
+      height: 38px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0 12px;
+      font-size: 0.88rem;
+      background: #fff;
+      outline: none;
+    }
+
+    .field-hint {
+      margin-top: 8px;
+      font-size: 0.84rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .btn-save-global {
+      height: 38px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      padding: 0 16px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .param-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .param-box {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+
+    .param-box h3 {
+      font-size: 1.05rem;
+      margin-bottom: 10px;
+    }
+
+    .param-actions {
+      margin-top: 12px;
+    }
+
+    .param-actions .btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    @media (max-width: 920px) {
+      .preprocess-row {
+        grid-template-columns: 1fr;
+      }
+      .param-grid {
+        grid-template-columns: 1fr;
+      }
+      .train-box {
+        align-items: stretch;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div style="width:36px;height:36px;background:#253044;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="fa-solid fa-envelope-open-text" style="color:#60a5fa;font-size:1rem;"></i>
+      </div>
+      <span class="brand-name">Digi<span>Surat</span></span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard_admin.html" class="nav-item"><i class="nav-icon fa-solid fa-table-cells-large"></i><span>Dashboard</span></a>
+      <a href="manajemen_surat.html" class="nav-item"><i class="nav-icon fa-regular fa-folder-open"></i><span>Manajemen Surat</span></a>
+      <a href="kategori_surat.html" class="nav-item"><i class="nav-icon fa-solid fa-tags"></i><span>Kategori Surat</span></a>
+      <a href="perbandingan_algoritma.html" class="nav-item"><i class="nav-icon fa-solid fa-chart-column"></i><span>Perbandingan Algoritma</span></a>
+      <a href="laporan_arsip.html" class="nav-item"><i class="nav-icon fa-regular fa-file-lines"></i><span>Laporan Arsip</span></a>
+      <a href="manajemen_user.html" class="nav-item"><i class="nav-icon fa-solid fa-users"></i><span>Manajemen User</span></a>
+      <a href="pengaturan_ai.html" class="nav-item active"><i class="nav-icon fa-solid fa-gear"></i><span>Pengaturan AI</span></a>
+    </nav>
+  </aside>
+
+  <header class="topbar">
+    <h1 class="topbar-title">Tuning & Pengaturan Kecerdasan Buatan</h1>
+    <div class="topbar-right">
+      <div style="position:relative;">
+        <button class="user-menu-btn" id="userMenuBtn" onclick="toggleDropdown()">
+          <img src="https://ui-avatars.com/api/?name=Admin&background=3b82f6&color=fff&size=72" alt="Avatar Admin" class="user-avatar">
+          Admin
+          <i class="fa-solid fa-chevron-down chevron"></i>
+        </button>
+        <div class="dropdown-menu" id="dropdownMenu">
+          <a href="pengaturan_akun_admin.html"><i class="fa-regular fa-user"></i> Profil Saya</a>
+          <a href="#" onclick="openGantiSandi()"><i class="fa-solid fa-key"></i> Ganti Sandi</a>
+          <div class="dropdown-divider"></div>
+          <button class="logout-btn" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <section class="ai-card">
+      <h2>Status Engine AI: Aktif</h2>
+      <div class="engine-row">
+        <div class="engine-meta">
+          <div class="muted">Model AI terakhir dilatih pada: 20 Februari 2026 | Total Data Latih: 150 Surat</div>
+          <div style="margin-top:6px;"><i class="fa-solid fa-chart-line"></i> Evaluasi Terakhir: K-NN (88%) | Naive Bayes (85%)</div>
+        </div>
+        <div class="train-box">
+          <div class="upload-inline">
+            <input type="file" id="datasetFile" accept=".csv,.xlsx,.xls,.json">
+          </div>
+          <button class="btn-train"><i class="fa-solid fa-rotate"></i> Latih Dataset</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="ai-card">
+      <h2>Pengaturan Pre-Processing Teks (Global)</h2>
+      <div class="preprocess-row">
+        <div>
+          <label class="field-label" for="fiturEkstraksi">Teknik Ekstraksi Fitur</label>
+          <select id="fiturEkstraksi" class="field-control">
+            <option>TF-IDF - Sangat Disarankan</option>
+            <option>Count Vectorizer</option>
+            <option>Bag of Words</option>
+          </select>
+          <p class="field-hint">Mengubah teks surat menjadi matriks angka. Proses ini dilakukan sebelum data diklasifikasikan oleh K-NN atau Naive Bayes.</p>
+        </div>
+        <button class="btn-save-global"><i class="fa-solid fa-floppy-disk"></i> Simpan Untuk Semua</button>
+      </div>
+    </section>
+
+    <section class="param-grid">
+      <div class="ai-card param-box">
+        <h3>Parameter K-NN</h3>
+        <label class="field-label" for="nilaiK">Nilai K</label>
+        <input id="nilaiK" class="field-control" type="number" value="11" min="1">
+        <label class="field-label" for="metrikJarak" style="margin-top:10px;">Metrik Perhitungan Jarak</label>
+        <select id="metrikJarak" class="field-control">
+          <option>Euclidean Distance (standar)</option>
+          <option>Manhattan Distance</option>
+          <option>Cosine Distance</option>
+        </select>
+        <div class="param-actions">
+          <button class="btn btn-outline"><i class="fa-solid fa-floppy-disk"></i> Simpan Konfigurasi KNN</button>
+        </div>
+      </div>
+
+      <div class="ai-card param-box">
+        <h3>Parameter Naive Bayes</h3>
+        <label class="field-label" for="laplaceSmoothing">Laplace Smoothing</label>
+        <input id="laplaceSmoothing" class="field-control" type="number" step="0.1" value="1.0" min="0">
+        <div class="param-actions">
+          <button class="btn btn-outline"><i class="fa-solid fa-floppy-disk"></i> Simpan Konfigurasi Naive Bayes</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- MODAL GANTI SANDI -->
+<div class="modal-overlay" id="gantiSandiModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title"><i class="fa-solid fa-key"></i> Ganti Password</span>
+      <button class="modal-close" onclick="closeModal('gantiSandiModal')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password Lama</label>
+      <div class="pass-input-wrap">
+        <input type="password" class="form-control" id="oldPass" placeholder="••••••••">
+        <button type="button" class="pass-eye-btn" onclick="togglePassField('oldPass',this)"><i class="fa-solid fa-eye"></i></button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password Baru</label>
+      <div class="pass-input-wrap">
+        <input type="password" class="form-control" id="newPass" placeholder="••••••••" oninput="checkStrength(this.value)">
+        <button type="button" class="pass-eye-btn" onclick="togglePassField('newPass',this)"><i class="fa-solid fa-eye"></i></button>
+      </div>
+      <div class="password-strength" id="passStrengthBar"></div>
+      <div id="passStrengthLabel" style="font-size:0.75rem;color:var(--text-muted);margin-top:3px;"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Konfirmasi Password Baru</label>
+      <div class="pass-input-wrap">
+        <input type="password" class="form-control" id="confirmPass" placeholder="••••••••">
+        <button type="button" class="pass-eye-btn" onclick="togglePassField('confirmPass',this)"><i class="fa-solid fa-eye"></i></button>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeModal('gantiSandiModal')">Batal</button>
+      <button class="btn btn-primary" onclick="submitGantiSandi()"><i class="fa-solid fa-save"></i> Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LOGOUT -->
+<div class="modal-overlay" id="logoutModal">
+  <div class="modal" style="max-width:380px;">
+    <div class="confirm-icon"><i class="fa-solid fa-right-from-bracket"></i></div>
+    <div class="confirm-text">
+      <h3>Konfirmasi Logout</h3>
+      <p>Apakah Anda yakin ingin keluar dari sistem?</p>
+    </div>
+    <div class="form-actions" style="justify-content:center;">
+      <button class="btn btn-outline" onclick="closeModal('logoutModal')">Batal</button>
+      <button class="btn btn-danger" onclick="confirmLogout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="../static/data.js"></script>
+<script src="../static/app.js"></script>
+<script>
+  initPage('pengaturan-ai');
+</script>
+</body>
+</html>
