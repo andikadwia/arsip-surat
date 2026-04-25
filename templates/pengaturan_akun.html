@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../static/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
-    /* Sesuai gambar referensi pengaturan_akun karyawan */
+    /* CSS disamakan persis dengan pengaturan_akun_admin.html */
     .profil-wrap {
       background: #fff;
       border: 1px solid var(--border);
@@ -17,7 +17,6 @@
       margin-bottom: 20px;
       overflow: hidden;
     }
-    /* ---- Header profil ---- */
     .profil-header {
       position: relative;
       display: flex;
@@ -36,28 +35,17 @@
     }
     .profil-avatar-wrap {
       position: relative;
-      width: 80px; height: 80px;
+      width: 90px; height: 90px;
       margin-bottom: 12px;
     }
     .profil-avatar-wrap img {
-      width: 80px; height: 80px;
+      width: 90px; height: 90px;
       border-radius: 50%;
       object-fit: cover;
       border: 3px solid #ddd;
     }
-    .avatar-cam-btn {
-      position: absolute; bottom: 0; right: 0;
-      width: 24px; height: 24px;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #fff;
-      border: 2px solid #fff;
-      font-size: 0.64rem;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-    }
-    .profil-name { font-size: 1.05rem; font-weight: 700; margin-bottom: 2px; }
-    .profil-sub { font-size: 0.8rem; color: var(--text-secondary); }
+    .profil-name { font-size: 1.15rem; font-weight: 700; margin-bottom: 4px; }
+    .profil-sub { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px; text-align: center; }
 
     /* ---- Tabs ---- */
     .profil-tabs {
@@ -126,28 +114,13 @@
       font-size: 0.75rem; font-weight: 600;
     }
     .sb-selesai { background: #dcfce7; color: #166534; }
-    .sb-sukses { background: #dcfce7; color: #166534; }
-    .sb-info { background: #dbeafe; color: #1e40af; }
-
-    /* Security card */
-    .security-card {
-      background: #fff; border: 1px solid var(--border);
-      border-radius: var(--radius); box-shadow: var(--shadow);
-      padding: 24px 28px; margin-bottom: 20px;
-    }
-    .sec-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 13px 0; border-bottom: 1px solid var(--border-light);
-    }
-    .sec-row:last-child { border-bottom: none; }
-    .sec-row-info .sec-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 2px; }
-    .sec-row-info .sec-sub { font-size: 0.78rem; color: var(--text-secondary); }
+    .sb-sukses  { background: #dcfce7; color: #166534; }
+    .sb-info    { background: #dbeafe; color: #1e40af; }
   </style>
 </head>
 <body>
 <div class="app-layout">
 
-  <!-- SIDEBAR (karyawan: hanya Dashboard) -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <div style="width:36px;height:36px;background:#253044;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -162,7 +135,6 @@
     </nav>
   </aside>
 
-  <!-- TOP BAR -->
   <header class="topbar">
     <h1 class="topbar-title">Pengaturan Akun</h1>
     <div class="topbar-right">
@@ -175,40 +147,36 @@
         </button>
         <div class="dropdown-menu" id="dropdownMenu">
           <a href="pengaturan_akun.html"><i class="fa-regular fa-user"></i> Profil Saya</a>
-          <a href="#" onclick="openGantiSandi()"><i class="fa-solid fa-key"></i> Ganti Sandi</a>
+          <a href="#" onclick="openModal('gantiSandiModal')"><i class="fa-solid fa-key"></i> Ganti Sandi</a>
           <div class="dropdown-divider"></div>
-          <button class="logout-btn" onclick="handleLogout()">
-            <i class="fa-solid fa-right-from-bracket"></i> Logout
+          <button class="logout-btn" onclick="openModal('logoutModal')">
+            <i class="fa-solid fa-right-from-bracket"></i> Keluar
           </button>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- MAIN CONTENT -->
   <main class="main-content">
 
-    <!-- ======= CARD 1: INFO AKUN ======= -->
     <div class="profil-wrap">
 
-      <!-- Header: avatar, nama, role -->
       <div class="profil-header">
         <span class="hak-akses-label">Hak Akses: Karyawan</span>
 
         <div class="profil-avatar-wrap">
           <img src="https://ui-avatars.com/api/?name=Karyawan&background=22c55e&color=fff&size=160"
                alt="Avatar Karyawan" id="profileAvatar">
-          <label class="avatar-cam-btn" for="avatarInput" title="Ganti foto">
-            <i class="fa-solid fa-camera"></i>
-            <input type="file" id="avatarInput" accept="image/*" style="display:none;" onchange="changeAvatar(this)">
-          </label>
         </div>
 
         <div class="profil-name" id="profileName">Karyawan</div>
         <div class="profil-sub">Pengguna Sistem Pengarsipan Surat Digital DigiSurat</div>
+        
+        <button class="btn btn-outline" style="padding: 7px 16px; font-size: 0.85rem;" onclick="bukaModalEditProfil()">
+          <i class="fa-solid fa-pen-to-square"></i> Edit Profil
+        </button>
       </div>
 
-      <!-- Tabs -->
       <div class="profil-tabs">
         <button class="profil-tab-btn active" id="tabInfoBtn" onclick="switchTab('info')">
           <i class="fa-regular fa-user"></i> Informasi Akun
@@ -218,7 +186,6 @@
         </button>
       </div>
 
-      <!-- TAB: INFORMASI AKUN -->
       <div class="tab-pane active" id="tabInfo">
         <div class="info-row-2">
           <div class="info-field">
@@ -237,7 +204,6 @@
           </div>
         </div>
 
-        <!-- Mini Stats -->
         <div class="mini-stats-3">
           <div class="mini-stat-box">
             <div class="ms-lbl">Surat Diakses</div>
@@ -254,7 +220,6 @@
         </div>
       </div>
 
-      <!-- TAB: RIWAYAT AKTIVITAS -->
       <div class="tab-pane" id="tabAktivitas">
         <table class="act-tbl">
           <thead>
@@ -292,61 +257,33 @@
             </tr>
           </tbody>
         </table>
-        <a href="#" class="see-all-link"
-           onclick="showToast('Menampilkan semua aktivitas','info');return false;">
+        <a href="#" class="see-all-link" style="display: block; text-align: center; padding: 16px; font-size: 0.88rem; font-weight: 600; color: var(--text-secondary); border-top: 1px solid var(--border-light); margin-top: 10px; text-decoration: none;" onclick="showToast('Menampilkan semua aktivitas','info');return false;">
           Lihat semua
         </a>
-      </div>
-    </div>
-
-    <!-- ======= CARD 2: KEAMANAN AKUN ======= -->
-    <div class="security-card">
-      <h2 style="font-size:0.95rem;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px;">
-        <i class="fa-solid fa-shield-halved" style="color:var(--accent);"></i> Keamanan Akun
-      </h2>
-      <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:16px;">
-        Kelola password dan sesi login Anda
-      </p>
-      <div class="sec-row">
-        <div class="sec-row-info">
-          <div class="sec-title">Password</div>
-          <div class="sec-sub">Terakhir diubah: 01 Jan 2026</div>
-        </div>
-        <button class="btn btn-outline" onclick="openGantiSandi()">
-          <i class="fa-solid fa-lock"></i> Ganti Sandi
-        </button>
-      </div>
-      <div class="sec-row">
-        <div class="sec-row-info">
-          <div class="sec-title">Edit Profil</div>
-          <div class="sec-sub">Ubah nama dan email akun Anda</div>
-        </div>
-        <button class="btn btn-primary" onclick="openModal('editProfilModal')">
-          <i class="fa-solid fa-pen-to-square"></i> Edit Profil
-        </button>
-      </div>
-      <div class="sec-row">
-        <div class="sec-row-info">
-          <div class="sec-title">Sesi Aktif</div>
-          <div class="sec-sub">1 sesi aktif saat ini</div>
-        </div>
-        <button class="btn btn-outline" style="color:var(--danger);border-color:var(--danger);"
-                onclick="handleLogout()">
-          <i class="fa-solid fa-right-from-bracket"></i> Keluar Semua
-        </button>
       </div>
     </div>
 
   </main>
 </div>
 
-<!-- MODAL EDIT PROFIL -->
 <div class="modal-overlay" id="editProfilModal">
   <div class="modal">
     <div class="modal-header">
       <span class="modal-title"><i class="fa-solid fa-pen-to-square"></i> Edit Profil</span>
       <button class="modal-close" onclick="closeModal('editProfilModal')">✕</button>
     </div>
+    
+    <div class="form-group" style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px;">
+      <div style="position: relative; width: 85px; height: 85px;">
+        <img src="https://ui-avatars.com/api/?name=Karyawan&background=22c55e&color=fff&size=160" id="previewModalFoto" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 2px solid var(--border);">
+        <label for="inputGantiFoto" style="position: absolute; bottom: 0; right: -5px; background: var(--accent); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white; font-size: 0.75rem; transition: 0.2s;">
+          <i class="fa-solid fa-camera"></i>
+        </label>
+        <input type="file" id="inputGantiFoto" accept="image/*" style="display:none;" onchange="previewFotoDiModal(this)">
+      </div>
+      <span style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px;">Format: JPG, PNG (Maks 2MB)</span>
+    </div>
+
     <div class="form-group">
       <label class="form-label">Nama Lengkap</label>
       <input type="text" class="form-control" id="editProfilNama" placeholder="Nama lengkap">
@@ -358,13 +295,12 @@
     <div class="form-actions">
       <button class="btn btn-outline" onclick="closeModal('editProfilModal')">Batal</button>
       <button class="btn btn-primary" onclick="submitEditProfil()">
-        <i class="fa-solid fa-save"></i> Simpan
+        <i class="fa-solid fa-save"></i> Simpan Perubahan
       </button>
     </div>
   </div>
 </div>
 
-<!-- MODAL GANTI SANDI -->
 <div class="modal-overlay" id="gantiSandiModal">
   <div class="modal">
     <div class="modal-header">
@@ -396,14 +332,11 @@
     </div>
     <div class="form-actions">
       <button class="btn btn-outline" onclick="closeModal('gantiSandiModal')">Batal</button>
-      <button class="btn btn-primary" onclick="submitGantiSandi()">
-        <i class="fa-solid fa-save"></i> Simpan
-      </button>
+      <button class="btn btn-primary" onclick="submitGantiSandi()"><i class="fa-solid fa-save"></i> Simpan</button>
     </div>
   </div>
 </div>
 
-<!-- LOGOUT MODAL -->
 <div class="modal-overlay" id="logoutModal">
   <div class="modal" style="max-width:380px;">
     <div class="confirm-icon"><i class="fa-solid fa-right-from-bracket"></i></div>
@@ -413,8 +346,8 @@
     </div>
     <div class="form-actions" style="justify-content:center;">
       <button class="btn btn-outline" onclick="closeModal('logoutModal')">Batal</button>
-      <button class="btn btn-danger" onclick="confirmLogout()">
-        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      <button class="btn btn-danger" onclick="window.location.href='login.html'">
+        <i class="fa-solid fa-right-from-bracket"></i> Keluar
       </button>
     </div>
   </div>
@@ -427,7 +360,10 @@
 <script>
   initPage('pengaturan-akun-karyawan');
 
-  // Pre-fill modal edit profil
+  // Variabel untuk menyimpan gambar secara sementara
+  let tempFoto = null;
+
+  // Pre-fill modal edit profil bawaan
   document.getElementById('editProfilNama').value = 'Karyawan';
   document.getElementById('editProfilEmail').value = 'karyawan@polibatam.ac.id';
 
@@ -438,28 +374,50 @@
     document.getElementById('tabAktivitasBtn').classList.toggle('active', tab === 'aktivitas');
   }
 
-  function changeAvatar(input) {
+  // Fungsi saat mengklik tombol edit profil
+  function bukaModalEditProfil() {
+    // Sinkronkan foto yang ada di luar ke dalam modal sebelum dibuka
+    document.getElementById('previewModalFoto').src = document.getElementById('profileAvatar').src;
+    tempFoto = null; // Reset foto sementara
+    openModal('editProfilModal');
+  }
+
+  // Fungsi untuk mempratinjau gambar di dalam modal sebelum disimpan
+  function previewFotoDiModal(input) {
     if (input.files && input.files[0]) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        document.getElementById('profileAvatar').src = e.target.result;
-        document.getElementById('topbarAvatar').src = e.target.result;
-        showToast('Foto profil berhasil diperbarui!', 'success');
+        document.getElementById('previewModalFoto').src = e.target.result;
+        tempFoto = e.target.result; // Simpan ke variabel sementara
       };
       reader.readAsDataURL(input.files[0]);
     }
   }
 
+  // Fungsi saat tombol simpan diklik
   function submitEditProfil() {
     const nama = document.getElementById('editProfilNama').value.trim();
     const email = document.getElementById('editProfilEmail').value.trim();
     if (!nama || !email) { showToast('Harap isi semua field!', 'error'); return; }
+    
+    // Terapkan perubahan teks
     document.getElementById('profileName').textContent = nama;
     document.getElementById('infoNama').textContent = nama;
     document.getElementById('infoEmail').textContent = email;
     document.getElementById('topbarName').textContent = nama;
+    
+    // Terapkan perubahan foto jika user mengganti foto di dalam modal
+    if (tempFoto) {
+      document.getElementById('profileAvatar').src = tempFoto;
+      document.getElementById('topbarAvatar').src  = tempFoto;
+    }
+
     closeModal('editProfilModal');
     showToast('Profil berhasil diperbarui!', 'success');
+  }
+
+  function toggleDropdown() {
+    document.getElementById('dropdownMenu').classList.toggle('open');
   }
 </script>
 </body>

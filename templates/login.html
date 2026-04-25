@@ -5,85 +5,247 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DigiSurat – Login</title>
   <meta name="description" content="Login ke Sistem Pengarsipan Surat Digital DigiSurat">
-  <link rel="stylesheet" href="../static/style.css">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  
   <style>
-    .login-page { background: linear-gradient(135deg, #1a2332 0%, #253044 50%, #1e3a5f 100%); }
-    .login-card { animation: fadeUp 0.4s ease both; }
+    /* Reset & Base Styles */
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      /* Mengganti font menjadi Poppins */
+      font-family: 'Poppins', sans-serif; 
+    }
+    
+    body { background-color: #f3f4f6; height: 100vh; overflow: hidden; }
+    
+    /* Layout Container Utama */
+    .login-container {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+      background: linear-gradient(to right, rgba(30, 58, 95, 0.5), rgba(30, 58, 95, 0.8)), 
+                  url('/static/uploads/bg.png') center/cover;
+    }
+
+    /* Sisi Kiri - Teks Sambutan */
+    .hero-section {
+      flex: 1.2;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 60px;
+      color: white;
+    }
+    .hero-text h1 {
+      font-size: 2.2rem;
+      margin-bottom: 15px;
+      font-weight: 600;
+    }
+    .hero-text p {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #e2e8f0;
+      max-width: 600px;
+      font-weight: 300;
+    }
+
+    /* Sisi Kanan - Area Form */
+    .form-section {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    /* Login Card */
+    .login-card {
+      width: 80%; 
+      max-width: 450px;
+      background: #ffffff;
+      padding: 45px 40px;
+      border-radius: 24px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+      animation: fadeUp 0.4s ease both;
+    }
+
     @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(24px); }
+      from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .role-selector { display: flex; gap: 8px; margin-bottom: 22px; }
-    .role-btn {
-      flex: 1; padding: 9px; border-radius: 6px; border: 1.5px solid var(--border);
-      background: transparent; font-size: 0.85rem; font-weight: 600;
-      color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+
+    /* Branding */
+    .brand-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 15px;
     }
-    .role-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .role-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+    .brand-icon {
+      width: 50px;
+      height: 50px;
+      background: #1e3a5f;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #60a5fa;
+      font-size: 1.5rem;
+    }
+    .brand-text {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #1e3a5f;
+    }
+    .brand-text span { color: #64748b; font-weight: 400; }
+    
+    .login-title {
+      text-align: center;
+      font-size: 1.1rem;
+      color: #444;
+      margin-bottom: 35px;
+      font-weight: 500;
+    }
+
+    /* Form Elements */
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+      color: #1f2937;
+      font-weight: 500;
+    }
+    .pass-input-wrap {
+      position: relative;
+    }
+    .form-control {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      color: #333;
+      transition: all 0.2s;
+      font-family: 'Poppins', sans-serif;
+    }
+    .form-control:focus {
+      outline: none;
+      border-color: #8bb4f6;
+      box-shadow: 0 0 0 3px rgba(139, 180, 246, 0.2);
+    }
+    .pass-eye-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #64748b;
+      cursor: pointer;
+    }
+
+    /* Checkbox (Hanya Visual) */
+    .form-options {
+      display: flex;
+      align-items: center;
+      margin-bottom: 30px;
+      gap: 10px;
+    }
+    .form-options input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .form-options label {
+      font-size: 0.9rem;
+      color: #333;
+      cursor: pointer;
+    }
+
+    /* Button */
+    .btn-primary {
+      width: 100%;
+      padding: 14px;
+      background-color: #8bb4f6;
+      color: #1e3a5f;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      font-family: 'Poppins', sans-serif;
+    }
+    .btn-primary:hover {
+      background-color: #76a3eb;
+    }
+
+    @media (max-width: 900px) {
+      .hero-section { display: none; }
+      .login-card { width: 90%; padding: 30px; }
+    }
   </style>
 </head>
 <body>
-  <div class="login-page">
-    <div class="login-card">
-      <div class="login-logo">
-        <div style="width:44px;height:44px;background:#1a2332;border-radius:10px;display:flex;align-items:center;justify-content:center;">
-          <i class="fa-solid fa-envelope-open-text" style="color:#60a5fa;font-size:1.2rem;"></i>
-        </div>
-        <div class="brand">Digi<span>Surat</span></div>
+
+  <div class="login-container">
+    <div class="hero-section">
+      <div class="hero-text">
+        <h1>Selamat Datang di DigiSurat</h1>
+        <p>Platform terintegrasi untuk kemudahan pencarian, penyimpanan, dan pengelolaan arsip dokumen secara terpusat, aman, dan efisien.</p>
       </div>
-      <p class="login-subtitle">Sistem Pengarsipan Surat Digital</p>
+    </div>
 
-      <div class="role-selector">
-        <button class="role-btn active" id="roleAdminBtn" onclick="setRole('admin')">
-          <i class="fa-solid fa-user-shield"></i> Admin
-        </button>
-        <button class="role-btn" id="roleKaryawanBtn" onclick="setRole('karyawan')">
-          <i class="fa-solid fa-user"></i> Karyawan
-        </button>
-      </div>
-
-      <form id="loginForm" onsubmit="handleLogin(event)">
-        <div class="form-group">
-          <label class="form-label">Email</label>
-          <div class="pass-input-wrap">
-            <input type="email" class="form-control" id="emailInput" placeholder="email@polibatam.ac.id" required>
-            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:0.85rem;">
-            </span>
+    <div class="form-section">
+      <div class="login-card">
+        <div class="brand-container">
+          <div class="brand-icon">
+            <i class="fa-solid fa-envelope-open-text"></i>
           </div>
+          <div class="brand-text">Digi<span>Surat</span></div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Password</label>
-          <div class="pass-input-wrap">
-            <input type="password" class="form-control" id="passwordInput" placeholder="••••••••" required>
-            <button type="button" class="pass-eye-btn" id="eyeBtn" onclick="togglePass()">
-              <i class="fa-solid fa-eye" id="eyeIcon"></i>
-            </button>
-          </div>
-        </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px;" id="loginBtn">
-          <i class="fa-solid fa-right-to-bracket"></i> Masuk
-        </button>
-      </form>
+        
+        <h2 class="login-title">Halaman Masuk DigiSurat</h2>
 
-      <div class="login-footer">
-        Sistem Pengarsipan Surat Digital &copy; 2026 Politeknik Batam
+        <form id="loginForm" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" id="emailInput" placeholder="Masukkan email Anda" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Kata Sandi</label>
+            <div class="pass-input-wrap">
+              <input type="password" class="form-control" id="passwordInput" placeholder="Masukkan kata sandi Anda" required>
+              <button type="button" class="pass-eye-btn" onclick="togglePass()">
+                <i class="fa-solid fa-eye" id="eyeIcon"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-options">
+            <input type="checkbox" id="rememberMe">
+            <label for="rememberMe">Ingat Saya</label>
+          </div>
+
+          <button type="submit" class="btn-primary" id="loginBtn">Masuk</button>
+        </form>
       </div>
     </div>
   </div>
 
-  <div class="toast-container" id="toastContainer"></div>
-
-  <script>
-    let selectedRole = 'admin';
-
-    function setRole(role) {
-      selectedRole = role;
-      document.getElementById('roleAdminBtn').classList.toggle('active', role === 'admin');
-      document.getElementById('roleKaryawanBtn').classList.toggle('active', role === 'karyawan');
-    }
-
+<script>
     function togglePass() {
       const inp = document.getElementById('passwordInput');
       const icon = document.getElementById('eyeIcon');
@@ -98,28 +260,33 @@
 
     function handleLogin(e) {
       e.preventDefault();
+      
+      // 1. Ambil nilai yang diketik pengguna
+      const email = document.getElementById('emailInput').value.toLowerCase();
+      const password = document.getElementById('passwordInput').value;
       const btn = document.getElementById('loginBtn');
+      
+      // 2. Ubah tombol jadi loading
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
 
+      // 3. Simulasi waktu tunggu server (1 detik) lalu cek siapa yang login
       setTimeout(() => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Masuk';
-        if (selectedRole === 'admin') {
+        // Jika login sebagai Admin
+        if (email === 'admin@polibatam.ac.id' && password === 'admin123') {
           window.location.href = 'dashboard_admin.html';
-        } else {
+        } 
+        // Jika login sebagai Karyawan
+        else if (email === 'karyawan@polibatam.ac.id' && password === 'karyawan123') {
           window.location.href = 'dashboard_karyawan.html';
+        } 
+        // Jika email/password salah
+        else {
+          alert('Login Gagal! Email atau password salah.\n\nGunakan:\nAdmin: admin@polibatam.ac.id / admin123\nKaryawan: karyawan@polibatam.ac.id / karyawan123');
+          btn.disabled = false;
+          btn.innerHTML = 'Masuk';
         }
-      }, 900);
-    }
-
-    function showToast(msg, type = 'info') {
-      const c = document.getElementById('toastContainer');
-      const t = document.createElement('div');
-      t.className = `toast ${type}`;
-      t.innerHTML = `<i class="fa-solid fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle'}"></i> ${msg}`;
-      c.appendChild(t);
-      setTimeout(() => { t.classList.add('fade-out'); setTimeout(() => t.remove(), 350); }, 3000);
+      }, 1000);
     }
   </script>
 </body>
