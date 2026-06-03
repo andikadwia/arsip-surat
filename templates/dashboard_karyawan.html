@@ -89,7 +89,6 @@
 <body>
 <div class="app-layout">
 
-  <!-- SIDEBAR - hanya Dashboard -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <div style="width:36px;height:36px;background:#253044;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -98,20 +97,19 @@
       <span class="brand-name">Digi<span>Surat</span></span>
     </div>
     <nav class="sidebar-nav">
-      <a href="dashboard_karyawan.html" class="nav-item active">
+      <a href="/dashboard_karyawan" class="nav-item active">
         <i class="nav-icon fa-solid fa-table-cells-large"></i><span>Dashboard</span>
       </a>
     </nav>
   </aside>
 
-  <!-- TOP BAR -->
   <header class="topbar">
     <h1 class="topbar-title">Ruang Kerja: Karyawan</h1>
     <div class="topbar-right">
       <div style="position:relative;">
         <button class="user-menu-btn" id="userMenuBtn" onclick="toggleDropdown()">
           <img src="https://ui-avatars.com/api/?name=Karyawan&background=22c55e&color=fff&size=72"
-               alt="Avatar Karyawan" class="user-avatar">
+              alt="Avatar Karyawan" class="user-avatar">
           Karyawan
           <i class="fa-solid fa-chevron-down chevron"></i>
         </button>
@@ -126,10 +124,8 @@
     </div>
   </header>
 
-  <!-- MAIN CONTENT -->
   <main class="main-content">
 
-    <!-- STATS CARDS -->
     <div class="stats-grid">
       <div class="stat-card">
         <span class="stat-label">Total Surat</span>
@@ -149,7 +145,6 @@
       </div>
     </div>
 
-    <!-- TOOLBAR: Search + Unduh Semua -->
     <div class="karyawan-toolbar">
       <div class="search-field">
         <input type="text" id="searchInput" placeholder="Cari..." oninput="filterTable()">
@@ -163,7 +158,6 @@
       </button>
     </div>
 
-    <!-- TABEL ARSIP -->
     <div class="arsip-panel">
       <div class="arsip-panel-title">Daftar Surat Arsip</div>
       <div class="arsip-table-wrap">
@@ -189,7 +183,6 @@
   </main>
 </div>
 
-<!-- MODAL GANTI SANDI -->
 <div class="modal-overlay" id="gantiSandiModal">
   <div class="modal">
     <div class="modal-header">
@@ -226,7 +219,6 @@
   </div>
 </div>
 
-<!-- MODAL LOGOUT -->
 <div class="modal-overlay" id="logoutModal">
   <div class="modal" style="max-width:380px;">
     <div class="confirm-icon"><i class="fa-solid fa-right-from-bracket"></i></div>

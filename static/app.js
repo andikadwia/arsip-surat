@@ -1,5 +1,5 @@
 /* ============================================================
-   DigiSurat - App Logic (shared across all pages)
+  DigiSurat - App Logic (shared across all pages)
    ============================================================ */
 
 /* ---- Toast ---- */
@@ -126,7 +126,9 @@ function handleLogout() {
 function confirmLogout() {
   closeModal('logoutModal');
   showToast('Berhasil logout. Mengarahkan ke halaman login...', 'info');
-  setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+  
+  // UBAH BARIS INI: Arahkan ke route Flask '/logout', bukan 'login.html'
+  setTimeout(() => { window.location.href = '/logout'; }, 1200); 
 }
 
 /* ---- Render Tables ---- */
