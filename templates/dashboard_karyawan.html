@@ -133,15 +133,15 @@
       </div>
       <div class="stat-card">
         <span class="stat-label">Total User</span>
-        <span class="stat-value">85%</span>
+        <span class="stat-value" id="statTotalUser">0</span>
       </div>
       <div class="stat-card">
         <span class="stat-label">Akurasi Tertinggi</span>
-        <span class="stat-value">82%</span>
+        <span class="stat-value">85%</span>
       </div>
       <div class="stat-card">
         <span class="stat-label">Data Latih</span>
-        <span class="stat-value">82%</span>
+        <span class="stat-value" id="statDataLatih">0 Surat</span>
       </div>
     </div>
 
@@ -241,8 +241,57 @@
 <script src="../static/app.js"></script>
 <script>
   initPage('dashboard-karyawan');
-  renderKaryawanTable('karyawanTableBody', 5);
-  document.getElementById('statTotalSurat').textContent = getLetters().length;
+  
+  let allSurat = [];
+  
+  async function loadDashboardKaryawanData() {
+    try {
+      const resSurat = await fetch('/api/surat');
+      const dataSurat = await resSurat.json();
+      allSurat = [...dataSurat].reverse();
+      
+      const resUser = await fetch('/api/users');
+      const dataUser = await resUser.json();
+      
+      document.getElementById('statTotalSurat').textContent = dataSurat.length;
+      document.getElementById('statTotalUser').textContent = dataUser.length;
+      document.getElementById('statDataLatih').textContent = dataSurat.length + ' Surat';
+      
+      renderTableKaryawan(5);
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal memuat data dashboard', 'error');
+    }
+  }
+  
+  function renderTableKaryawan(limit) {
+    const tbody = document.getElementById('karyawanTableBody');
+    const items = limit ? allSurat.slice(0, limit) : allSurat;
+    
+    if (items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">Belum ada arsip surat.</td></tr>`;
+      return;
+    }
+    
+    tbody.innerHTML = items.map((l, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${l.nomor}</td>
+        <td>${l.tanggal}</td>
+        <td>${l.pengirim}</td>
+        <td>${l.perihal}</td>
+        <td><span class="badge-info">${l.kategori}</span></td>
+        <td>${l.file_path ? `<a href="/${l.file_path}" target="_blank" style="color:var(--accent); font-weight:600;"><i class="fa-solid fa-file-pdf"></i> Lihat</a>` : '-'}</td>
+        <td>
+            <a href="${l.file_path ? '/' + l.file_path : '#'}" download="${l.file_path ? l.file_path.split('/').pop() : ''}" class="tbl-unduh-btn" onclick="${l.file_path ? '' : 'event.preventDefault(); showToast(\\'File tidak tersedia\\', \\'error\\');'}">
+              <i class="fa-solid fa-download"></i> Unduh
+            </a>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  loadDashboardKaryawanData();
 
   function filterTable() {
     const q = document.getElementById('searchInput').value.toLowerCase();
@@ -256,7 +305,7 @@
     e.preventDefault();
     if (!showingAll) {
       showingAll = true;
-      renderKaryawanTable('karyawanTableBody', Infinity);
+      renderTableKaryawan(null);
       document.getElementById('lihatSemuaBtn').style.display = 'none';
       showToast('Menampilkan semua surat', 'info');
     }

@@ -278,29 +278,100 @@
 <script src="../static/app.js"></script>
 <script>
   initPage('manajemen-surat');
-  renderAdminSuratTable('suratTableBody', 5);
+  
+  let showingAll = false;
+  let currentSuratList = [];
 
-  function filterSurat() {
-    const q = document.getElementById('searchInput').value.toLowerCase();
-    const kat = document.getElementById('kategoriFilter').value.toLowerCase();
-    const rows = document.querySelectorAll('#suratTableBody tr');
-    rows.forEach(r => {
-      const text = r.textContent.toLowerCase();
-      const matchQ = text.includes(q);
-      const matchKat = !kat || text.includes(kat);
-      r.style.display = (matchQ && matchKat) ? '' : 'none';
-    });
+  // Fetch data dari API
+  async function fetchSurat(limit) {
+    try {
+      const response = await fetch('/api/surat');
+      const data = await response.json();
+      currentSuratList = data;
+      renderLocalTable(limit);
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal memuat data surat', 'error');
+    }
   }
 
-  let showingAll = false;
+  // Render tabel secara lokal
+  function renderLocalTable(limit) {
+    const tbody = document.getElementById('suratTableBody');
+    if (!tbody) return;
+    
+    // Filter juga bisa diterapkan di sini jika ada pencarian aktif
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    const kat = document.getElementById('kategoriFilter').value.toLowerCase();
+    
+    let filtered = currentSuratList.filter(l => {
+      const text = Object.values(l).join(' ').toLowerCase();
+      const matchQ = text.includes(q);
+      const matchKat = !kat || l.kategori.toLowerCase().includes(kat);
+      return matchQ && matchKat;
+    });
+
+    const isInfinity = limit === Infinity || limit == null;
+    const itemsLimit = isInfinity ? filtered.length : limit;
+    
+    const showAllBtnContainer = document.getElementById('lihatSemuaContainer');
+    if (showAllBtnContainer) {
+      if (filtered.length <= itemsLimit || isInfinity) {
+        showAllBtnContainer.style.display = 'none';
+      } else {
+        showAllBtnContainer.style.display = 'block';
+      }
+    }
+
+    const letters = filtered.slice(0, itemsLimit);
+    
+    if (letters.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted);"><i class="fa-solid fa-inbox" style="font-size:1.5rem;display:block;margin-bottom:8px;"></i>Belum ada data surat</td></tr>`;
+      return;
+    }
+    
+    tbody.innerHTML = letters.map((l, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td style="font-size:0.83rem;">${l.nomor}</td>
+        <td>${l.tanggal}</td>
+        <td style="font-size:0.83rem;">${l.pengirim}</td>
+        <td style="font-size:0.83rem;">${l.perihal}</td>
+        <td><span class="badge-info">${l.kategori}</span></td>
+        <td style="font-size:0.83rem;color:var(--accent);"><i class="fa-regular fa-file-pdf"></i> ${l.file}</td>
+        <td style="white-space:nowrap;">
+          <button class="action-btn btn-edit" title="Edit" onclick="openEditSurat(${l.id})">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button class="action-btn btn-delete" title="Hapus" onclick="openDeleteSurat(${l.id})" style="margin-left:4px;">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      </tr>
+    `).join('');
+    
+    applyViewerMode();
+  }
+
+  // Panggil fetch awal
+  fetchSurat(5);
+
+  function filterSurat() {
+    renderLocalTable(showingAll ? Infinity : 5);
+  }
+
   function showAllSurat(e) {
     e.preventDefault();
     if (!showingAll) {
       showToast('Menampilkan semua arsip surat...', 'info');
-      renderAdminSuratTable('suratTableBody', Infinity);
-      document.getElementById('lihatSemuaContainer').style.display = 'none';
       showingAll = true;
+      document.getElementById('lihatSemuaContainer').style.display = 'none';
+      renderLocalTable(Infinity);
     }
+  }
+
+  function getLetterById(id) {
+    return currentSuratList.find(l => l.id == id);
   }
 
   function onFileSelect(input) {
@@ -309,7 +380,7 @@
     }
   }
 
-  function submitUploadSurat() {
+  async function submitUploadSurat() {
     const nomor = document.getElementById('uploadNomor').value.trim();
     const tanggal = document.getElementById('uploadTanggal').value;
     const pengirim = document.getElementById('uploadPengirim').value.trim();
@@ -322,19 +393,33 @@
     }
 
     const fileName = fileInput.files[0] ? fileInput.files[0].name : 'surat_baru.pdf';
-    const newLetter = { id: Date.now(), nomor, tanggal: tanggal.split('-').reverse().join('-'), pengirim, perihal, kategori, file: fileName };
-    addLetter(newLetter);
-    renderAdminSuratTable('suratTableBody', showingAll ? Infinity : 5);
-    closeModal('uploadSuratModal');
-    showToast('Surat berhasil diunggah!', 'success');
+    const newLetter = { nomor, tanggal, pengirim, perihal, kategori, file: fileName };
 
-    document.getElementById('uploadNomor').value = '';
-    document.getElementById('uploadTanggal').value = '';
-    document.getElementById('uploadPengirim').value = '';
-    document.getElementById('uploadPerihal').value = '';
-    document.getElementById('uploadKategori').value = '';
-    document.getElementById('uploadFileName').textContent = 'Klik untuk pilih file atau drag & drop disini';
-    fileInput.value = '';
+    try {
+      const response = await fetch('/api/surat/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(newLetter)
+      });
+      const res = await response.json();
+      if (res.status === 'success') {
+        closeModal('uploadSuratModal');
+        showToast('Surat berhasil diunggah!', 'success');
+        fetchSurat(showingAll ? Infinity : 5);
+        
+        document.getElementById('uploadNomor').value = '';
+        document.getElementById('uploadTanggal').value = '';
+        document.getElementById('uploadPengirim').value = '';
+        document.getElementById('uploadPerihal').value = '';
+        document.getElementById('uploadKategori').value = '';
+        document.getElementById('uploadFileName').textContent = 'Klik untuk pilih file atau drag & drop disini';
+        fileInput.value = '';
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch(e) {
+      showToast('Terjadi kesalahan', 'error');
+    }
   }
 
   function openEditSurat(id) {
@@ -342,14 +427,14 @@
     if (!letter) return;
     document.getElementById('editSuratId').value = id;
     document.getElementById('editNomor').value = letter.nomor;
-    document.getElementById('editTanggal').value = letter.tanggal.split('-').reverse().join('-');
+    document.getElementById('editTanggal').value = letter.tanggal; // sudah format YYYY-MM-DD
     document.getElementById('editPengirim').value = letter.pengirim;
     document.getElementById('editPerihal').value = letter.perihal;
     document.getElementById('editKategori').value = letter.kategori;
     openModal('editSuratModal');
   }
 
-  function submitEditSurat() {
+  async function submitEditSurat() {
     const id = parseInt(document.getElementById('editSuratId').value);
     const nomor = document.getElementById('editNomor').value.trim();
     const tanggal = document.getElementById('editTanggal').value;
@@ -359,10 +444,26 @@
     if (!nomor || !tanggal || !pengirim || !perihal || !kategori) {
       showToast('Harap isi semua field!', 'error'); return;
     }
-    updateLetter(id, { nomor, tanggal: tanggal.split('-').reverse().join('-'), pengirim, perihal, kategori });
-    renderAdminSuratTable('suratTableBody', showingAll ? Infinity : 5);
-    closeModal('editSuratModal');
-    showToast('Surat berhasil diperbarui!', 'success');
+    
+    const updatedLetter = { nomor, tanggal, pengirim, perihal, kategori };
+
+    try {
+      const response = await fetch('/api/surat/edit/' + id, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(updatedLetter)
+      });
+      const res = await response.json();
+      if (res.status === 'success') {
+        closeModal('editSuratModal');
+        showToast('Surat berhasil diperbarui!', 'success');
+        fetchSurat(showingAll ? Infinity : 5);
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch(e) {
+      showToast('Terjadi kesalahan', 'error');
+    }
   }
 
   function openDeleteSurat(id) {
@@ -370,16 +471,27 @@
     openModal('deleteSuratModal');
   }
 
-  function confirmDeleteSurat() {
+  async function confirmDeleteSurat() {
     const id = parseInt(document.getElementById('deleteSuratId').value);
-    deleteLetter(id);
-    renderAdminSuratTable('suratTableBody', showingAll ? Infinity : 5);
-    closeModal('deleteSuratModal');
-    showToast('Surat berhasil dihapus!', 'success');
+    try {
+      const response = await fetch('/api/surat/delete/' + id, {
+        method: 'DELETE'
+      });
+      const res = await response.json();
+      if (res.status === 'success') {
+        closeModal('deleteSuratModal');
+        showToast('Surat berhasil dihapus!', 'success');
+        fetchSurat(showingAll ? Infinity : 5);
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch(e) {
+      showToast('Terjadi kesalahan', 'error');
+    }
   }
 
   function openDocumentViewer(id) {
-    const letter = typeof getLetterById === 'function' ? getLetterById(id) : null;
+    const letter = getLetterById(id);
     if (!letter) return;
     
     document.getElementById('vNomor').textContent = letter.nomor;
@@ -403,7 +515,7 @@
       if (actionTd && !actionTd.querySelector('.btn-action-detail')) {
         const editBtn = actionTd.querySelector('button[onclick^="openEditSurat"]');
         if (editBtn) {
-          const idMatch = editBtn.getAttribute('onclick').match(/\d+/);
+          const idMatch = editBtn.getAttribute('onclick').match(/\\d+/);
           if (idMatch) {
             const id = idMatch[0];
             const detailBtn = document.createElement('button');
@@ -415,24 +527,21 @@
         }
       }
 
-      const fileTd = row.querySelector('td:nth-last-child(2) a');
-      if (fileTd && !fileTd.hasAttribute('data-viewer-linked')) {
+      const fileTd = row.querySelector('td:nth-last-child(2) i');
+      if (fileTd && !fileTd.parentElement.hasAttribute('data-viewer-linked')) {
         const editBtn = row.querySelector('button[onclick^="openEditSurat"]');
         if (editBtn) {
-          const idMatch = editBtn.getAttribute('onclick').match(/\d+/);
+          const idMatch = editBtn.getAttribute('onclick').match(/\\d+/);
           if (idMatch) {
-              fileTd.href = 'javascript:void(0)';
-              fileTd.setAttribute('onclick', `openDocumentViewer(${idMatch[0]})`);
-              fileTd.setAttribute('data-viewer-linked', 'true');
+              const fileContainer = fileTd.parentElement;
+              fileContainer.style.cursor = 'pointer';
+              fileContainer.setAttribute('onclick', `openDocumentViewer(${idMatch[0]})`);
+              fileContainer.setAttribute('data-viewer-linked', 'true');
           }
         }
       }
     });
   }
-
-  applyViewerMode();
-  const tableObserver = new MutationObserver(() => { applyViewerMode(); });
-  tableObserver.observe(document.getElementById('suratTableBody'), { childList: true, subtree: true });
 
 </script>
 </body>

@@ -72,9 +72,9 @@
   <main class="main-content">
     <div class="stats-grid">
       <div class="stat-card"><span class="stat-label">Total Surat</span><span class="stat-value" id="statTotalSurat">0</span></div>
-      <div class="stat-card"><span class="stat-label">Total User</span><span class="stat-value" id="statTotalUser">2</span></div>
+      <div class="stat-card"><span class="stat-label">Total User</span><span class="stat-value" id="statTotalUser">0</span></div>
       <div class="stat-card"><span class="stat-label">Akurasi Tertinggi</span><span class="stat-value">85%</span></div>
-      <div class="stat-card"><span class="stat-label">Data Latih</span><span class="stat-value">150 Surat</span></div>
+      <div class="stat-card"><span class="stat-label">Data Latih</span><span class="stat-value" id="statDataLatih">0 Surat</span></div>
     </div>
 
     <div class="arsip-panel" style="margin-bottom: 24px;">
@@ -188,9 +188,44 @@
 <script src="../static/app.js"></script>
 <script>
   initPage('dashboard-admin');
-  renderDashboardTable('dashboardTableBody', false);
-  document.getElementById('statTotalSurat').textContent = getLetters().length;
-  document.getElementById('statTotalUser').textContent = getUsers().length;
+  
+  async function loadDashboardAdminData() {
+    try {
+      const resSurat = await fetch('/api/surat');
+      const dataSurat = await resSurat.json();
+      
+      const resUser = await fetch('/api/users');
+      const dataUser = await resUser.json();
+      
+      document.getElementById('statTotalSurat').textContent = dataSurat.length;
+      document.getElementById('statTotalUser').textContent = dataUser.length;
+      document.getElementById('statDataLatih').textContent = dataSurat.length + ' Surat';
+      
+      const tbody = document.getElementById('dashboardTableBody');
+      const latestSurat = dataSurat.slice(-5).reverse(); 
+      
+      if (latestSurat.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">Belum ada arsip surat.</td></tr>`;
+      } else {
+        tbody.innerHTML = latestSurat.map((l, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${l.nomor}</td>
+            <td>${l.tanggal}</td>
+            <td>${l.pengirim}</td>
+            <td>${l.perihal}</td>
+            <td><span class="badge-info">${l.kategori}</span></td>
+            <td>${l.file_path ? `<a href="/${l.file_path}" target="_blank" style="color:var(--accent); font-weight:600;"><i class="fa-solid fa-file-pdf"></i> Lihat</a>` : '-'}</td>
+          </tr>
+        `).join('');
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal memuat data dashboard', 'error');
+    }
+  }
+
+  loadDashboardAdminData();
 
   function toggleDropdown() {
     document.getElementById('dropdownMenu').classList.toggle('open');

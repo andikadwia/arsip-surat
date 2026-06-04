@@ -69,21 +69,18 @@
       <div class="filter-group">
         <label for="kategoriLaporan">Kategori Surat</label>
         <select id="kategoriLaporan">
-          <option>Semua Kategori</option>
-          <option>Undangan</option>
-          <option>Pemberitahuan</option>
-          <option>Keputusan</option>
+          <option value="">Semua Kategori</option>
         </select>
       </div>
-      <button class="btn-show" onclick="showToast('Menampilkan data...', 'info')"><i class="fa-solid fa-magnifying-glass"></i> Tampilkan Data</button>
+      <button class="btn-show" onclick="triggerFilter()"><i class="fa-solid fa-magnifying-glass"></i> Tampilkan Data</button>
     </section>
 
     <section>
       <div class="preview-header">
         <h2>Preview Laporan Arsip</h2>
         <div class="export-actions">
-          <button class="btn-export excel" onclick="showToast('Berhasil mengekspor ke Excel', 'success')"><i class="fa-regular fa-file-excel"></i> Export Excel</button>
-          <button class="btn-export pdf" onclick="showToast('Berhasil mengekspor ke PDF', 'success')"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
+          <button class="btn-export excel" onclick="exportExcel()"><i class="fa-regular fa-file-excel"></i> Export Excel</button>
+          <button class="btn-export pdf" onclick="exportPDF()"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
         </div>
       </div>
 
@@ -95,14 +92,13 @@
               <tr><th>No</th><th>Nomor Surat</th><th>Tanggal Surat</th><th>Pengirim</th><th>Perihal</th><th>Kategori</th></tr>
             </thead>
             <tbody>
-              <tr><td>1</td><td>420/123/Disdik-SB/IV/2026</td><td>10-04-2026</td><td>Dinas Pendidikan Sumatera Barat</td><td>Undangan Rapat Koordinasi Pendidikan</td><td>Undangan</td></tr>
-              <tr><td>2</td><td>001/PKB/III/2026</td><td>08-03-2026</td><td>Politeknik Negeri Batam</td><td>Pemberitahuan Jadwal Ujian Akhir Semester</td><td>Pemberitahuan</td></tr>
+              <!-- Akan diisi oleh JS -->
             </tbody>
           </table>
         </div>
         
-        <div style="padding: 16px; text-align: center; border-top: 1px solid var(--border); background: #fff;">
-          <button class="btn-show" onclick="showToast('Menampilkan semua arsip surat...', 'info')">
+        <div id="btnLihatSemua" style="padding: 16px; text-align: center; border-top: 1px solid var(--border); background: #fff;">
+          <button class="btn-show" onclick="triggerLihatSemua()">
             <i></i> Lihat Semua
           </button>
         </div>
@@ -130,11 +126,128 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="../static/data.js"></script>
 <script src="../static/app.js"></script>
 <script>
-  function toggleDropdown() {
-    document.getElementById('dropdownMenu').classList.toggle('open');
+  initPage('laporan-arsip');
+  
+  let allSurat = [];
+  
+  async function fetchSurat() {
+    try {
+      const response = await fetch('/api/surat');
+      allSurat = await response.json();
+      filterDanTampilkanData(5);
+      
+      const resKategori = await fetch('/api/kategori');
+      const dataKategori = await resKategori.json();
+      const selectKat = document.getElementById('kategoriLaporan');
+      selectKat.innerHTML = '<option value="">Semua Kategori</option>';
+      dataKategori.forEach(k => {
+        selectKat.innerHTML += `<option value="${k.nama}">${k.nama}</option>`;
+      });
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal memuat data', 'error');
+    }
+  }
+
+  function filterDanTampilkanData(limit) {
+    const tglMulai = document.getElementById('tanggalMulai').value;
+    const tglSampai = document.getElementById('tanggalSampai').value;
+    const kategori = document.getElementById('kategoriLaporan').value;
+    
+    let filtered = allSurat.filter(s => {
+      let matchTgl = true;
+      if (tglMulai && s.tanggal < tglMulai) matchTgl = false;
+      if (tglSampai && s.tanggal > tglSampai) matchTgl = false;
+      
+      let matchKat = true;
+      if (kategori && s.kategori !== kategori) matchKat = false;
+      
+      return matchTgl && matchKat;
+    });
+
+    renderTable(filtered, limit);
+  }
+
+  function renderTable(data, limit) {
+    const tbody = document.querySelector('.data-table tbody');
+    if (!tbody) return;
+    
+    const isInfinity = limit === Infinity || limit == null;
+    const itemsLimit = isInfinity ? data.length : limit;
+    
+    const showAllBtnContainer = document.getElementById('btnLihatSemua');
+    if (showAllBtnContainer) {
+      if (data.length <= itemsLimit || isInfinity) {
+        showAllBtnContainer.style.display = 'none';
+      } else {
+        showAllBtnContainer.style.display = 'block';
+      }
+    }
+    
+    const items = data.slice(0, itemsLimit);
+    
+    if (items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted);">Tidak ada data yang sesuai</td></tr>`;
+      return;
+    }
+    
+    tbody.innerHTML = items.map((l, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${l.nomor}</td>
+        <td>${l.tanggal}</td>
+        <td>${l.pengirim}</td>
+        <td>${l.perihal}</td>
+        <td><span class="badge-info">${l.kategori}</span></td>
+      </tr>
+    `).join('');
+  }
+
+  fetchSurat();
+
+  function triggerFilter() {
+    showToast('Menampilkan data...', 'info');
+    filterDanTampilkanData();
+    document.getElementById('btnLihatSemua').style.display = 'none';
+  }
+  
+  function triggerLihatSemua() {
+    showToast('Menampilkan semua arsip surat...', 'info');
+    document.getElementById('tanggalMulai').value = '';
+    document.getElementById('tanggalSampai').value = '';
+    document.getElementById('kategoriLaporan').value = '';
+    filterDanTampilkanData();
+    document.getElementById('btnLihatSemua').style.display = 'none';
+  }
+
+  function exportExcel() {
+    showToast('Mengekspor ke Excel (CSV)...', 'info');
+    const tbody = document.querySelector('.data-table tbody');
+    const rows = tbody.querySelectorAll('tr');
+    let csvContent = "data:text/csv;charset=utf-8,No,Nomor Surat,Tanggal Surat,Pengirim,Perihal,Kategori\n";
+    
+    rows.forEach(r => {
+        const cols = r.querySelectorAll('td');
+        if(cols.length > 1) {
+            const rowData = Array.from(cols).map(c => `"${c.innerText}"`).join(",");
+            csvContent += rowData + "\n";
+        }
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "laporan_arsip.csv");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function exportPDF() {
+    showToast('Menyiapkan cetak PDF...', 'info');
+    window.print();
   }
 </script>
 </body>

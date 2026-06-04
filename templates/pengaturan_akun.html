@@ -140,9 +140,9 @@
     <div class="topbar-right">
       <div style="position:relative;">
         <button class="user-menu-btn" id="userMenuBtn" onclick="toggleDropdown()">
-          <img src="https://ui-avatars.com/api/?name=Karyawan&background=22c55e&color=fff&size=72"
-               alt="Avatar Karyawan" class="user-avatar" id="topbarAvatar">
-          <span id="topbarName">Karyawan</span>
+          <img src="{{ '/' + current_user.foto if current_user.foto else 'https://ui-avatars.com/api/?name=' + current_user.nama + '&background=22c55e&color=fff&size=72' }}"
+               alt="Avatar" class="user-avatar" id="topbarAvatar">
+          <span id="topbarName">{{ current_user.nama }}</span>
           <i class="fa-solid fa-chevron-down chevron"></i>
         </button>
         <div class="dropdown-menu" id="dropdownMenu">
@@ -162,14 +162,14 @@
     <div class="profil-wrap">
 
       <div class="profil-header">
-        <span class="hak-akses-label">Hak Akses: Karyawan</span>
+        <span class="hak-akses-label">Hak Akses: {{ current_user.role }}</span>
 
         <div class="profil-avatar-wrap">
-          <img src="https://ui-avatars.com/api/?name=Karyawan&background=22c55e&color=fff&size=160"
-               alt="Avatar Karyawan" id="profileAvatar">
+          <img src="{{ '/' + current_user.foto if current_user.foto else 'https://ui-avatars.com/api/?name=' + current_user.nama + '&background=22c55e&color=fff&size=160' }}"
+               alt="Avatar" id="profileAvatar">
         </div>
 
-        <div class="profil-name" id="profileName">Karyawan</div>
+        <div class="profil-name" id="profileName">{{ current_user.nama }}</div>
         <div class="profil-sub">Pengguna Sistem Pengarsipan Surat Digital DigiSurat</div>
         
         <button class="btn btn-outline" style="padding: 7px 16px; font-size: 0.85rem;" onclick="bukaModalEditProfil()">
@@ -192,14 +192,14 @@
             <label>Nama Lengkap</label>
             <div class="info-value-box">
               <i class="fa-regular fa-user"></i>
-              <span id="infoNama">Karyawan</span>
+              <span id="infoNama">{{ current_user.nama }}</span>
             </div>
           </div>
           <div class="info-field">
             <label>Alamat Email Kampus</label>
             <div class="info-value-box">
               <i class="fa-regular fa-envelope"></i>
-              <span id="infoEmail">karyawan@polibatam.ac.id</span>
+              <span id="infoEmail">{{ current_user.email }}</span>
             </div>
           </div>
         </div>
@@ -275,7 +275,7 @@
     
     <div class="form-group" style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px;">
       <div style="position: relative; width: 85px; height: 85px;">
-        <img src="https://ui-avatars.com/api/?name=Karyawan&background=22c55e&color=fff&size=160" id="previewModalFoto" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 2px solid var(--border);">
+        <img src="{{ '/' + current_user.foto if current_user.foto else 'https://ui-avatars.com/api/?name=' + current_user.nama + '&background=22c55e&color=fff&size=160' }}" id="previewModalFoto" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 2px solid var(--border);">
         <label for="inputGantiFoto" style="position: absolute; bottom: 0; right: -5px; background: var(--accent); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white; font-size: 0.75rem; transition: 0.2s;">
           <i class="fa-solid fa-camera"></i>
         </label>
@@ -332,7 +332,7 @@
     </div>
     <div class="form-actions">
       <button class="btn btn-outline" onclick="closeModal('gantiSandiModal')">Batal</button>
-      <button class="btn btn-primary" onclick="submitGantiSandi()"><i class="fa-solid fa-save"></i> Simpan</button>
+      <button class="btn btn-primary" onclick="submitGantiSandiBaru()"><i class="fa-solid fa-save"></i> Simpan</button>
     </div>
   </div>
 </div>
@@ -360,12 +360,10 @@
 <script>
   initPage('pengaturan-akun-karyawan');
 
-  // Variabel untuk menyimpan gambar secara sementara
   let tempFoto = null;
 
-  // Pre-fill modal edit profil bawaan
-  document.getElementById('editProfilNama').value = 'Karyawan';
-  document.getElementById('editProfilEmail').value = 'karyawan@polibatam.ac.id';
+  document.getElementById('editProfilNama').value = '{{ current_user.nama }}';
+  document.getElementById('editProfilEmail').value = '{{ current_user.email }}';
 
   function switchTab(tab) {
     document.getElementById('tabInfo').classList.toggle('active', tab === 'info');
@@ -374,46 +372,100 @@
     document.getElementById('tabAktivitasBtn').classList.toggle('active', tab === 'aktivitas');
   }
 
-  // Fungsi saat mengklik tombol edit profil
   function bukaModalEditProfil() {
-    // Sinkronkan foto yang ada di luar ke dalam modal sebelum dibuka
     document.getElementById('previewModalFoto').src = document.getElementById('profileAvatar').src;
-    tempFoto = null; // Reset foto sementara
+    tempFoto = null;
     openModal('editProfilModal');
   }
 
-  // Fungsi untuk mempratinjau gambar di dalam modal sebelum disimpan
   function previewFotoDiModal(input) {
     if (input.files && input.files[0]) {
       const reader = new FileReader();
       reader.onload = (e) => {
         document.getElementById('previewModalFoto').src = e.target.result;
-        tempFoto = e.target.result; // Simpan ke variabel sementara
+        tempFoto = e.target.result;
       };
       reader.readAsDataURL(input.files[0]);
     }
   }
 
-  // Fungsi saat tombol simpan diklik
-  function submitEditProfil() {
+  async function submitEditProfil() {
     const nama = document.getElementById('editProfilNama').value.trim();
     const email = document.getElementById('editProfilEmail').value.trim();
     if (!nama || !email) { showToast('Harap isi semua field!', 'error'); return; }
     
-    // Terapkan perubahan teks
-    document.getElementById('profileName').textContent = nama;
-    document.getElementById('infoNama').textContent = nama;
-    document.getElementById('infoEmail').textContent = email;
-    document.getElementById('topbarName').textContent = nama;
+    const fotoInput = document.getElementById('inputGantiFoto');
+    const formData = new FormData();
+    formData.append('nama', nama);
+    formData.append('email', email);
+    if (fotoInput.files[0]) {
+        formData.append('foto', fotoInput.files[0]);
+    }
     
-    // Terapkan perubahan foto jika user mengganti foto di dalam modal
-    if (tempFoto) {
-      document.getElementById('profileAvatar').src = tempFoto;
-      document.getElementById('topbarAvatar').src  = tempFoto;
+    try {
+      const response = await fetch('/api/profile/update', {
+        method: 'POST',
+        body: formData
+      });
+      const res = await response.json();
+      if (res.status === 'success') {
+        document.getElementById('profileName').textContent = nama;
+        document.getElementById('infoNama').textContent = nama;
+        document.getElementById('infoEmail').textContent = email;
+        document.getElementById('topbarName').textContent = nama;
+        
+        if (res.foto_url) {
+          document.getElementById('profileAvatar').src = '/' + res.foto_url;
+          document.getElementById('topbarAvatar').src  = '/' + res.foto_url;
+        } else if (tempFoto) {
+          document.getElementById('profileAvatar').src = tempFoto;
+          document.getElementById('topbarAvatar').src  = tempFoto;
+        }
+
+        closeModal('editProfilModal');
+        showToast('Profil berhasil diperbarui!', 'success');
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch(e) {
+      showToast('Terjadi kesalahan', 'error');
+    }
+  }
+
+  async function submitGantiSandiBaru() {
+    const oldPass = document.getElementById('oldPass').value;
+    const newPass = document.getElementById('newPass').value;
+    const confirmPass = document.getElementById('confirmPass').value;
+
+    if (!oldPass || !newPass || !confirmPass) {
+      showToast('Harap isi semua field password!', 'error'); return;
+    }
+    if (newPass.length < 6) {
+      showToast('Password baru minimal 6 karakter!', 'error'); return;
+    }
+    if (newPass !== confirmPass) {
+      showToast('Konfirmasi password tidak cocok!', 'error'); return;
     }
 
-    closeModal('editProfilModal');
-    showToast('Profil berhasil diperbarui!', 'success');
+    try {
+      const response = await fetch('/api/profile/password', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ old_pass: oldPass, new_pass: newPass })
+      });
+      const res = await response.json();
+      if (res.status === 'success') {
+        closeModal('gantiSandiModal');
+        showToast('Password berhasil diubah!', 'success');
+        document.getElementById('oldPass').value = '';
+        document.getElementById('newPass').value = '';
+        document.getElementById('confirmPass').value = '';
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch(e) {
+      showToast('Terjadi kesalahan', 'error');
+    }
   }
 
   function toggleDropdown() {

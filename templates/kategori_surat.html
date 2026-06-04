@@ -188,25 +188,91 @@
 <script src="../static/app.js"></script>
 <script>
   initPage('kategori-surat');
-  renderKategoriTable();
+  
+  let currentKategoriList = [];
 
-  function filterKategori() {
-    const q = document.getElementById('searchInput').value.toLowerCase();
-    document.querySelectorAll('#kategoriTableBody tr').forEach(r => {
-      r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
-    });
+  // Fetch data dari API
+  async function fetchKategori() {
+    try {
+      const response = await fetch('/api/kategori');
+      const data = await response.json();
+      currentKategoriList = data;
+      renderLocalTable();
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal memuat data kategori', 'error');
+    }
   }
 
-  function submitTambahKategori() {
+  // Render tabel secara lokal
+  function renderLocalTable() {
+    const tbody = document.getElementById('kategoriTableBody');
+    if (!tbody) return;
+    
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    
+    let filtered = currentKategoriList.filter(k => {
+      const text = Object.values(k).join(' ').toLowerCase();
+      return text.includes(q);
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--text-muted);">Belum ada kategori atau tidak ditemukan</td></tr>`;
+      return;
+    }
+    
+    tbody.innerHTML = filtered.map((k, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td style="font-weight:600;">${k.nama}</td>
+        <td style="font-size:0.85rem;color:var(--text-secondary);">${k.deskripsi || '–'}</td>
+        <td style="white-space:nowrap;">
+          <button class="action-btn btn-edit" title="Edit" onclick="openEditKategori(${k.id})">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button class="action-btn btn-delete" title="Hapus" onclick="openDeleteKategori(${k.id})" style="margin-left:4px;">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // Panggil fetch awal
+  fetchKategori();
+
+  function filterKategori() {
+    renderLocalTable();
+  }
+
+  function getKategoriById(id) {
+    return currentKategoriList.find(k => k.id == id);
+  }
+
+  async function submitTambahKategori() {
     const nama = document.getElementById('tambahNamaKategori').value.trim();
     const deskripsi = document.getElementById('tambahDeskripsiKategori').value.trim();
     if (!nama) { showToast('Nama kategori tidak boleh kosong!', 'error'); return; }
-    addKategori({ id: Date.now(), nama, deskripsi });
-    renderKategoriTable();
-    closeModal('tambahKategoriModal');
-    showToast('Kategori berhasil ditambahkan!', 'success');
-    document.getElementById('tambahNamaKategori').value = '';
-    document.getElementById('tambahDeskripsiKategori').value = '';
+    
+    try {
+      const response = await fetch('/api/kategori/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ nama, deskripsi })
+      });
+      const res = await response.json();
+      if (res.status === 'success') {
+        closeModal('tambahKategoriModal');
+        showToast('Kategori berhasil ditambahkan!', 'success');
+        fetchKategori();
+        document.getElementById('tambahNamaKategori').value = '';
+        document.getElementById('tambahDeskripsiKategori').value = '';
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch(e) {
+      showToast('Terjadi kesalahan', 'error');
+    }
   }
 
   function openEditKategori(id) {
@@ -218,15 +284,29 @@
     openModal('editKategoriModal');
   }
 
-  function submitEditKategori() {
+  async function submitEditKategori() {
     const id = parseInt(document.getElementById('editKategoriId').value);
     const nama = document.getElementById('editNamaKategori').value.trim();
     const deskripsi = document.getElementById('editDeskripsiKategori').value.trim();
     if (!nama) { showToast('Nama kategori tidak boleh kosong!', 'error'); return; }
-    updateKategori(id, { nama, deskripsi });
-    renderKategoriTable();
-    closeModal('editKategoriModal');
-    showToast('Kategori berhasil diperbarui!', 'success');
+    
+    try {
+      const response = await fetch('/api/kategori/edit/' + id, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ nama, deskripsi })
+      });
+      const res = await response.json();
+      if (res.status === 'success') {
+        closeModal('editKategoriModal');
+        showToast('Kategori berhasil diperbarui!', 'success');
+        fetchKategori();
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch(e) {
+      showToast('Terjadi kesalahan', 'error');
+    }
   }
 
   function openDeleteKategori(id) {
@@ -234,12 +314,23 @@
     openModal('deleteKategoriModal');
   }
 
-  function confirmDeleteKategori() {
+  async function confirmDeleteKategori() {
     const id = parseInt(document.getElementById('deleteKategoriId').value);
-    deleteKategori(id);
-    renderKategoriTable();
-    closeModal('deleteKategoriModal');
-    showToast('Kategori berhasil dihapus!', 'success');
+    try {
+      const response = await fetch('/api/kategori/delete/' + id, {
+        method: 'DELETE'
+      });
+      const res = await response.json();
+      if (res.status === 'success') {
+        closeModal('deleteKategoriModal');
+        showToast('Kategori berhasil dihapus!', 'success');
+        fetchKategori();
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch(e) {
+      showToast('Terjadi kesalahan', 'error');
+    }
   }
 
   window.openEditKategori = openEditKategori;
