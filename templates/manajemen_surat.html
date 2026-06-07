@@ -37,6 +37,23 @@
     /* MODIFIKASI: Menambahkan Style Button Lihat Semua dari Laporan Arsip */
     .btn-show { height: 40px; border: 1.5px solid var(--border); background: var(--card-bg); border-radius: var(--radius-sm); padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: 0.2s;}
     .btn-show:hover { background: var(--border-light); }
+
+    .ai-suggest-box {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      font-size: 0.84rem;
+      display: none;
+    }
+    .ai-suggest-box.visible { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .ai-suggest-box .ai-label { color: #1e40af; font-weight: 600; }
+    .btn-apply-ai {
+      background: #2563eb; color: #fff; border: none; border-radius: 6px;
+      padding: 6px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-apply-ai:hover { background: #1d4ed8; }
   </style>
 </head>
 <body>
@@ -171,14 +188,18 @@
     </div>
     <div class="form-group">
       <label class="form-label">Pengirim *</label>
-      <input type="text" class="form-control" id="uploadPengirim" placeholder="Nama instansi / pengirim">
+      <input type="text" class="form-control" id="uploadPengirim" placeholder="Nama instansi / pengirim" oninput="scheduleAiClassify()">
     </div>
     <div class="form-group">
       <label class="form-label">Perihal *</label>
-      <input type="text" class="form-control" id="uploadPerihal" placeholder="Perihal / isi singkat surat">
+      <input type="text" class="form-control" id="uploadPerihal" placeholder="Perihal / isi singkat surat" oninput="scheduleAiClassify()">
+      <div class="ai-suggest-box" id="aiSuggestBox">
+        <span class="ai-label" id="aiSuggestText"><i class="fa-solid fa-robot"></i> Saran AI: -</span>
+        <button type="button" class="btn-apply-ai" onclick="applyAiSuggestion()">Terapkan Kategori</button>
+      </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Kategori *</label>
+      <label class="form-label">Kategori * <span style="font-weight:400;color:var(--text-secondary);font-size:0.8rem;">(bisa diisi otomatis oleh AI)</span></label>
       <select class="form-control" id="uploadKategori">
         <option value="">-- Pilih Kategori --</option>
         <option value="Undangan">Undangan</option>
@@ -303,22 +324,95 @@
     }
   }
 
+  let aiClassifyTimer = null;
+  let lastAiSuggestion = null;
+
   function onFileSelect(input) {
     if (input.files[0]) {
       document.getElementById('uploadFileName').textContent = input.files[0].name;
     }
   }
 
-  function submitUploadSurat() {
+  function scheduleAiClassify() {
+    clearTimeout(aiClassifyTimer);
+    aiClassifyTimer = setTimeout(runAiClassify, 600);
+  }
+
+  async function runAiClassify() {
+    const perihal = document.getElementById('uploadPerihal').value.trim();
+    const pengirim = document.getElementById('uploadPengirim').value.trim();
+    const box = document.getElementById('aiSuggestBox');
+    const textEl = document.getElementById('aiSuggestText');
+
+    if (!perihal) {
+      box.classList.remove('visible');
+      lastAiSuggestion = null;
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/ai/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ perihal, pengirim }),
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        lastAiSuggestion = data.kategori;
+        const conf = data.confidence ? ` (${data.confidence}% via ${data.model_display})` : ` (${data.model_display})`;
+        textEl.innerHTML = `<i class="fa-solid fa-robot"></i> Saran AI: <strong>${data.kategori}</strong>${conf}`;
+        box.classList.add('visible');
+      } else {
+        box.classList.remove('visible');
+        lastAiSuggestion = null;
+      }
+    } catch (e) {
+      box.classList.remove('visible');
+    }
+  }
+
+  function applyAiSuggestion() {
+    if (!lastAiSuggestion) return;
+    const select = document.getElementById('uploadKategori');
+    const opts = Array.from(select.options).map(o => o.value);
+    if (opts.includes(lastAiSuggestion)) {
+      select.value = lastAiSuggestion;
+      showToast(`Kategori diterapkan: ${lastAiSuggestion}`, 'success');
+    } else {
+      showToast(`Kategori "${lastAiSuggestion}" belum ada di daftar`, 'info');
+    }
+  }
+
+  async function submitUploadSurat() {
     const nomor = document.getElementById('uploadNomor').value.trim();
     const tanggal = document.getElementById('uploadTanggal').value;
     const pengirim = document.getElementById('uploadPengirim').value.trim();
     const perihal = document.getElementById('uploadPerihal').value.trim();
-    const kategori = document.getElementById('uploadKategori').value;
+    let kategori = document.getElementById('uploadKategori').value;
     const fileInput = document.getElementById('uploadFile');
 
-    if (!nomor || !tanggal || !pengirim || !perihal || !kategori) {
+    if (!nomor || !tanggal || !pengirim || !perihal) {
       showToast('Harap isi semua field yang diperlukan!', 'error'); return;
+    }
+
+    if (!kategori) {
+      if (lastAiSuggestion) {
+        kategori = lastAiSuggestion;
+      } else {
+        try {
+          const res = await fetch('/api/ai/classify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ perihal, pengirim }),
+          });
+          const data = await res.json();
+          if (data.status === 'success') kategori = data.kategori;
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    if (!kategori) {
+      showToast('Pilih kategori atau latih model AI terlebih dahulu!', 'error'); return;
     }
 
     const fileName = fileInput.files[0] ? fileInput.files[0].name : 'surat_baru.pdf';
@@ -326,7 +420,7 @@
     addLetter(newLetter);
     renderAdminSuratTable('suratTableBody', showingAll ? Infinity : 5);
     closeModal('uploadSuratModal');
-    showToast('Surat berhasil diunggah!', 'success');
+    showToast(`Surat berhasil diunggah! Kategori: ${kategori}`, 'success');
 
     document.getElementById('uploadNomor').value = '';
     document.getElementById('uploadTanggal').value = '';
@@ -334,6 +428,8 @@
     document.getElementById('uploadPerihal').value = '';
     document.getElementById('uploadKategori').value = '';
     document.getElementById('uploadFileName').textContent = 'Klik untuk pilih file atau drag & drop disini';
+    document.getElementById('aiSuggestBox').classList.remove('visible');
+    lastAiSuggestion = null;
     fileInput.value = '';
   }
 

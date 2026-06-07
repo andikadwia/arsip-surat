@@ -73,8 +73,8 @@
     <div class="stats-grid">
       <div class="stat-card"><span class="stat-label">Total Surat</span><span class="stat-value" id="statTotalSurat">0</span></div>
       <div class="stat-card"><span class="stat-label">Total User</span><span class="stat-value" id="statTotalUser">2</span></div>
-      <div class="stat-card"><span class="stat-label">Akurasi Tertinggi</span><span class="stat-value">85%</span></div>
-      <div class="stat-card"><span class="stat-label">Data Latih</span><span class="stat-value">150 Surat</span></div>
+      <div class="stat-card"><span class="stat-label">Akurasi Tertinggi</span><span class="stat-value" id="statAkurasi">-</span></div>
+      <div class="stat-card"><span class="stat-label">Data Latih</span><span class="stat-value" id="statDataLatih">-</span></div>
     </div>
 
     <div class="arsip-panel" style="margin-bottom: 24px;">
@@ -104,21 +104,21 @@
             <div class="y-axis-labels">
               <span>100%</span><span>90%</span><span>80%</span><span>70%</span><span>60%</span><span>50%</span><span>40%</span><span>30%</span><span>20%</span><span>10%</span><span>0%</span>
             </div>
-            <div class="metric-grid">
-              <div class="metric-group">
-                <div class="bar-pair"><div class="bar nb" style="height:82.5%;"><span class="bar-value">82.5%</span></div><div class="bar knn" style="height:85%;"><span class="bar-value">85%</span></div></div>
+            <div class="metric-grid" id="dashMetricGrid">
+              <div class="metric-group" data-metric="accuracy">
+                <div class="bar-pair"><div class="bar nb" style="height:0%;"><span class="bar-value nb-val">-</span></div><div class="bar knn" style="height:0%;"><span class="bar-value knn-val">-</span></div></div>
                 <div class="metric-name">Akurasi</div>
               </div>
-              <div class="metric-group">
-                <div class="bar-pair"><div class="bar nb" style="height:90%;"><span class="bar-value">90%</span></div><div class="bar knn" style="height:85%;"><span class="bar-value">85%</span></div></div>
+              <div class="metric-group" data-metric="precision">
+                <div class="bar-pair"><div class="bar nb" style="height:0%;"><span class="bar-value nb-val">-</span></div><div class="bar knn" style="height:0%;"><span class="bar-value knn-val">-</span></div></div>
                 <div class="metric-name">Precision</div>
               </div>
-              <div class="metric-group">
-                <div class="bar-pair"><div class="bar nb" style="height:93%;"><span class="bar-value">93%</span></div><div class="bar knn" style="height:96%;"><span class="bar-value">96%</span></div></div>
+              <div class="metric-group" data-metric="recall">
+                <div class="bar-pair"><div class="bar nb" style="height:0%;"><span class="bar-value nb-val">-</span></div><div class="bar knn" style="height:0%;"><span class="bar-value knn-val">-</span></div></div>
                 <div class="metric-name">Recall</div>
               </div>
-              <div class="metric-group">
-                <div class="bar-pair"><div class="bar nb" style="height:80%;"><span class="bar-value">80%</span></div><div class="bar knn" style="height:93%;"><span class="bar-value">93%</span></div></div>
+              <div class="metric-group" data-metric="f1">
+                <div class="bar-pair"><div class="bar nb" style="height:0%;"><span class="bar-value nb-val">-</span></div><div class="bar knn" style="height:0%;"><span class="bar-value knn-val">-</span></div></div>
                 <div class="metric-name">F1-score</div>
               </div>
             </div>
@@ -191,6 +191,29 @@
   renderDashboardTable('dashboardTableBody', false);
   document.getElementById('statTotalSurat').textContent = getLetters().length;
   document.getElementById('statTotalUser').textContent = getUsers().length;
+
+  function setDashBar(group, algo, value) {
+    const bar = group.querySelector('.bar.' + algo);
+    const label = group.querySelector('.' + algo + '-val');
+    const h = value != null ? Math.max(value * 100, 2) : 0;
+    bar.style.height = h + '%';
+    label.textContent = value != null ? (value * 100).toFixed(1) + '%' : '-';
+  }
+
+  fetch('/api/ai/status').then(r => r.json()).then(data => {
+    const nb = data.metrics?.naive_bayes || {};
+    const knn = data.metrics?.knn || {};
+    const best = Math.max(nb.accuracy || 0, knn.accuracy || 0);
+    document.getElementById('statAkurasi').textContent = data.trained ? (best * 100).toFixed(0) + '%' : '-';
+    document.getElementById('statDataLatih').textContent = data.trained ? data.total_samples + ' Surat' : '-';
+    ['accuracy', 'precision', 'recall', 'f1'].forEach(metric => {
+      const group = document.querySelector('#dashMetricGrid [data-metric="' + metric + '"]');
+      if (group) {
+        setDashBar(group, 'nb', nb[metric]);
+        setDashBar(group, 'knn', knn[metric]);
+      }
+    });
+  }).catch(() => {});
 
   function toggleDropdown() {
     document.getElementById('dropdownMenu').classList.toggle('open');

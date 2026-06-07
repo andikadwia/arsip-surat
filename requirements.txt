@@ -1,4 +1,9 @@
 flask
+flask-login
+flask-sqlalchemy
+pymysql
 pandas
 scikit-learn
 Sastrawi
+joblib
+openpyxl

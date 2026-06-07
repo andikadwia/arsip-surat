@@ -1,6 +1,8 @@
 from flask import Flask, render_template, redirect, url_for, request, jsonify, flash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import db, User, Kategori, Surat # Import database dari models.py
+from werkzeug.utils import secure_filename
+import ai_engine
 import os
 
 app = Flask(__name__)
@@ -179,6 +181,157 @@ def delete_user_api(id):
         db.session.commit()
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "User tidak ditemukan"})
+
+
+# ======================
+# API PENGATURAN AI (ML Pipeline)
+# ======================
+
+ALLOWED_DATASET_EXT = {'.csv', '.xlsx', '.xls', '.json'}
+
+
+def admin_required_api():
+    if not current_user.is_authenticated or current_user.role != 'Admin':
+        return jsonify({"status": "error", "message": "Akses ditolak. Hanya Admin."}), 403
+    return None
+
+
+@app.route("/api/ai/status", methods=["GET"])
+@login_required
+def ai_status():
+    return jsonify({"status": "success", **ai_engine.get_status()})
+
+
+@app.route("/api/ai/config", methods=["GET"])
+@login_required
+def ai_get_config():
+    return jsonify({"status": "success", "config": ai_engine.get_config()})
+
+
+@app.route("/api/ai/config", methods=["POST"])
+@login_required
+def ai_save_config():
+    denied = admin_required_api()
+    if denied:
+        return denied
+
+    data = request.json or {}
+    active_param = data.get('active_param')
+    if not active_param:
+        return jsonify({"status": "error", "message": "Pilih satu parameter aktif terlebih dahulu."}), 400
+
+    vectorizer_map = {
+        'TF-IDF - Sangat Disarankan': 'tfidf',
+        'tfidf': 'tfidf',
+        'Count Vectorizer': 'count',
+        'count': 'count',
+        'Bag of Words': 'bow',
+        'bow': 'bow',
+    }
+    metric_map = {
+        'Euclidean Distance (standar)': 'euclidean',
+        'euclidean': 'euclidean',
+        'Manhattan Distance': 'manhattan',
+        'manhattan': 'manhattan',
+        'Cosine Distance': 'cosine',
+        'cosine': 'cosine',
+    }
+
+    values = {}
+    if active_param == 'preprocessing':
+        values['vectorizer'] = vectorizer_map.get(data.get('vectorizer'), data.get('vectorizer', 'tfidf'))
+    elif active_param == 'knn':
+        values['knn_k'] = int(data.get('knn_k', 11))
+        values['knn_metric'] = metric_map.get(data.get('knn_metric'), data.get('knn_metric', 'euclidean'))
+    elif active_param == 'naive_bayes':
+        values['nb_alpha'] = float(data.get('nb_alpha', 1.0))
+    else:
+        return jsonify({"status": "error", "message": "Parameter aktif tidak valid."}), 400
+
+    try:
+        saved = ai_engine.save_active_param_config(active_param, values)
+        label_map = {
+            'preprocessing': 'Pre-Processing',
+            'knn': 'K-NN',
+            'naive_bayes': 'Naive Bayes',
+        }
+        return jsonify({
+            "status": "success",
+            "message": f"Konfigurasi {label_map[active_param]} disimpan",
+            "config": saved,
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@app.route("/api/ai/train", methods=["POST"])
+@login_required
+def ai_train():
+    denied = admin_required_api()
+    if denied:
+        return denied
+
+    if 'dataset' not in request.files:
+        return jsonify({"status": "error", "message": "File dataset wajib diunggah."}), 400
+
+    file = request.files['dataset']
+    if not file or not file.filename:
+        return jsonify({"status": "error", "message": "File dataset tidak valid."}), 400
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_DATASET_EXT:
+        return jsonify({"status": "error", "message": "Format tidak didukung. Gunakan CSV, XLSX, atau JSON."}), 400
+
+    os.makedirs(ai_engine.DATASETS_DIR, exist_ok=True)
+    filename = secure_filename(file.filename)
+    save_path = os.path.join(ai_engine.DATASETS_DIR, filename)
+    file.save(save_path)
+
+    active_param = (request.form.get('active_param') or '').strip()
+    if active_param not in ai_engine.VALID_ACTIVE_PARAMS:
+        return jsonify({
+            "status": "error",
+            "message": "Pilih satu parameter aktif (Pre-Processing, K-NN, atau Naive Bayes) sebelum melatih.",
+        }), 400
+
+    try:
+        ai_engine.update_config({}, active_param=active_param)
+        config = ai_engine.get_config()
+        metadata = ai_engine.train_models(save_path, config, target=active_param)
+        label_map = {
+            'preprocessing': 'Pre-Processing (Naive Bayes & K-NN)',
+            'knn': 'K-NN',
+            'naive_bayes': 'Naive Bayes',
+        }
+        trained_label = label_map.get(active_param, active_param)
+        return jsonify({
+            "status": "success",
+            "message": f"Pelatihan {trained_label} berhasil. Model .pkl tersimpan.",
+            "last_trained": metadata['last_trained'],
+            "total_samples": metadata['total_samples'],
+            "metrics": metadata['metrics'],
+            "best_model": metadata['best_model'],
+            "trained_target": metadata.get('last_trained_target', []),
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@app.route("/api/ai/classify", methods=["POST"])
+@login_required
+def ai_classify():
+    data = request.json or {}
+    perihal = (data.get('perihal') or '').strip()
+    pengirim = (data.get('pengirim') or '').strip()
+    text = f"{pengirim} {perihal}".strip() or perihal
+
+    if not text:
+        return jsonify({"status": "error", "message": "Perihal atau pengirim wajib diisi."}), 400
+
+    result = ai_engine.classify_text(text)
+    if result.get('status') == 'error':
+        return jsonify(result), 400
+    return jsonify(result)
 
 
 # ======================
