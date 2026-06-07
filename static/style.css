@@ -330,7 +330,8 @@ img { max-width: 100%; display: block; }
 }
 
 .data-table th, .data-table td {
-  white-space: nowrap;
+  white-space: normal;
+  word-wrap: break-word;
 }
 
 .data-table th {
