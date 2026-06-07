@@ -206,16 +206,16 @@
 
         <div class="mini-stats-3">
           <div class="mini-stat-box">
-            <div class="ms-lbl">Surat Diakses</div>
-            <div class="ms-val">128</div>
+            <div class="ms-lbl">Total Arsip Surat</div>
+            <div class="ms-val" id="karyStatSurat">...</div>
           </div>
           <div class="mini-stat-box">
-            <div class="ms-lbl">Kategori Populer</div>
-            <div class="ms-val" style="font-size:1rem;">Undangan</div>
+            <div class="ms-lbl">Kategori Terbanyak</div>
+            <div class="ms-val" id="karyStatKategori" style="font-size:1rem;">-</div>
           </div>
           <div class="mini-stat-box">
-            <div class="ms-lbl">Total Arsip</div>
-            <div class="ms-val">1.050</div>
+            <div class="ms-lbl">Akurasi AI</div>
+            <div class="ms-val" id="karyStatAkurasi">-</div>
           </div>
         </div>
       </div>
@@ -355,7 +355,6 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="../static/data.js"></script>
 <script src="../static/app.js"></script>
 <script>
   initPage('pengaturan-akun-karyawan');
@@ -364,6 +363,36 @@
 
   document.getElementById('editProfilNama').value = '{{ current_user.nama }}';
   document.getElementById('editProfilEmail').value = '{{ current_user.email }}';
+
+  // ── Load stat card dari API ──
+  async function loadKaryawanStats() {
+    try {
+      const [resSurat, resAi] = await Promise.all([
+        fetch('/api/surat'),
+        fetch('/api/profile/stats'),
+      ]);
+      const dataSurat = await resSurat.json();
+      const dataAi    = await resAi.json();
+
+      document.getElementById('karyStatSurat').textContent = dataSurat.length;
+      document.getElementById('karyStatAkurasi').textContent = dataAi.akurasi || '-';
+
+      // Hitung kategori terbanyak
+      if (dataSurat.length > 0) {
+        const freq = {};
+        dataSurat.forEach(s => { if (s.kategori) freq[s.kategori] = (freq[s.kategori] || 0) + 1; });
+        const top = Object.entries(freq).sort((a,b) => b[1]-a[1])[0];
+        document.getElementById('karyStatKategori').textContent = top ? top[0] : '-';
+      } else {
+        document.getElementById('karyStatKategori').textContent = '-';
+      }
+    } catch (e) {
+      document.getElementById('karyStatSurat').textContent   = '-';
+      document.getElementById('karyStatKategori').textContent = '-';
+      document.getElementById('karyStatAkurasi').textContent  = '-';
+    }
+  }
+  loadKaryawanStats();
 
   function switchTab(tab) {
     document.getElementById('tabInfo').classList.toggle('active', tab === 'info');

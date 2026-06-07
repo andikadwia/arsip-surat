@@ -108,13 +108,13 @@
     <div class="topbar-right">
       <div style="position:relative;">
         <button class="user-menu-btn" id="userMenuBtn" onclick="toggleDropdown()">
-          <img src="https://ui-avatars.com/api/?name=Karyawan&background=22c55e&color=fff&size=72"
-              alt="Avatar Karyawan" class="user-avatar">
-          Karyawan
+          <img src="{{ '/' + current_user.foto if current_user.foto else 'https://ui-avatars.com/api/?name=' + current_user.nama + '&background=22c55e&color=fff&size=72' }}"
+              alt="Avatar" class="user-avatar" id="topbarAvatar">
+          <span id="topbarName">{{ current_user.nama }}</span>
           <i class="fa-solid fa-chevron-down chevron"></i>
         </button>
         <div class="dropdown-menu" id="dropdownMenu">
-          <a href="pengaturan_akun.html"><i class="fa-regular fa-user"></i> Profil Saya</a>
+          <a href="/pengaturan_akun"><i class="fa-regular fa-user"></i> Profil Saya</a>
           <div class="dropdown-divider"></div>
           <button class="logout-btn" onclick="handleLogout()">
             <i class="fa-solid fa-right-from-bracket"></i> Logout
@@ -129,19 +129,19 @@
     <div class="stats-grid">
       <div class="stat-card">
         <span class="stat-label">Total Surat</span>
-        <span class="stat-value" id="statTotalSurat">0</span>
+        <span class="stat-value" id="statTotalSurat">...</span>
       </div>
       <div class="stat-card">
         <span class="stat-label">Total User</span>
-        <span class="stat-value" id="statTotalUser">0</span>
+        <span class="stat-value" id="statTotalUser">...</span>
       </div>
       <div class="stat-card">
         <span class="stat-label">Akurasi Tertinggi</span>
-        <span class="stat-value">85%</span>
+        <span class="stat-value" id="statAkurasi">-</span>
       </div>
       <div class="stat-card">
         <span class="stat-label">Data Latih</span>
-        <span class="stat-value" id="statDataLatih">0 Surat</span>
+        <span class="stat-value" id="statDataLatih">-</span>
       </div>
     </div>
 
@@ -237,7 +237,6 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="../static/data.js"></script>
 <script src="../static/app.js"></script>
 <script>
   initPage('dashboard-karyawan');
@@ -246,17 +245,32 @@
   
   async function loadDashboardKaryawanData() {
     try {
-      const resSurat = await fetch('/api/surat');
+      const [resSurat, resUser, resAi] = await Promise.all([
+        fetch('/api/surat'),
+        fetch('/api/users'),
+        fetch('/api/ai/status'),
+      ]);
       const dataSurat = await resSurat.json();
+      const dataUser  = await resUser.json();
+      const dataAi    = await resAi.json();
+
       allSurat = [...dataSurat].reverse();
-      
-      const resUser = await fetch('/api/users');
-      const dataUser = await resUser.json();
-      
+
       document.getElementById('statTotalSurat').textContent = dataSurat.length;
-      document.getElementById('statTotalUser').textContent = dataUser.length;
-      document.getElementById('statDataLatih').textContent = dataSurat.length + ' Surat';
-      
+      document.getElementById('statTotalUser').textContent  = dataUser.length;
+
+      // Stat AI
+      if (dataAi.trained) {
+        const nb  = dataAi.metrics?.naive_bayes || {};
+        const knn = dataAi.metrics?.knn || {};
+        const best = Math.max(nb.accuracy || 0, knn.accuracy || 0);
+        document.getElementById('statAkurasi').textContent  = (best * 100).toFixed(0) + '%';
+        document.getElementById('statDataLatih').textContent = dataAi.total_samples + ' Surat';
+      } else {
+        document.getElementById('statAkurasi').textContent  = '-';
+        document.getElementById('statDataLatih').textContent = '-';
+      }
+
       renderTableKaryawan(5);
     } catch (e) {
       console.error(e);

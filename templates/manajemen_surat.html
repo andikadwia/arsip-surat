@@ -116,35 +116,52 @@
       border: 1px solid #bfdbfe;
       font-size: 0.84rem;
       display: none;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     .ai-suggest-box.visible {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
+    }
+
+    .ai-suggest-box.analyzing {
+      display: flex;
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+
+    .ai-suggest-box.applied {
+      display: flex;
+      background: #f0fdf4;
+      border-color: #86efac;
     }
 
     .ai-suggest-box .ai-label {
       color: #1e40af;
       font-weight: 600;
+      flex: 1;
     }
 
-    .btn-apply-ai {
-      background: #2563eb;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: 6px 12px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
+    .ai-suggest-box.applied .ai-label {
+      color: #15803d;
     }
 
-    .btn-apply-ai:hover {
-      background: #1d4ed8;
+    .ai-suggest-box.analyzing .ai-label {
+      color: #64748b;
     }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .ai-analyzing-dots span {
+      animation: pulse-dot 1.2s ease-in-out infinite;
+    }
+
+    .ai-analyzing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .ai-analyzing-dots span:nth-child(3) { animation-delay: 0.4s; }
   </style>
 </head>
 
@@ -188,7 +205,7 @@
             <i class="fa-solid fa-chevron-down chevron"></i>
           </button>
           <div class="dropdown-menu" id="dropdownMenu">
-            <a href="pengaturan_akun_admin.html"><i class="fa-regular fa-user"></i> Profil Saya</a>
+            <a href="/pengaturan_akun_admin"><i class="fa-regular fa-user"></i> Profil Saya</a>
             <div class="dropdown-divider"></div>
             <button class="logout-btn" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i>
               Logout</button>
@@ -210,7 +227,7 @@
           <input type="text" id="searchInput" placeholder="Cari..." oninput="filterSurat()">
         </div>
         <div class="spacer"></div>
-        <button class="btn btn-upload" onclick="openModal('uploadSuratModal')">
+        <button class="btn btn-upload" onclick="openUploadModal()">
           <i class="fa-solid fa-upload"></i> Unggah
         </button>
       </div>
@@ -275,12 +292,90 @@
   </div>
 
   <div class="modal-overlay" id="uploadSuratModal">
-    <div class="modal" style="max-width:560px;">
+    <div class="modal" style="max-width:580px;">
       <div class="modal-header">
         <span class="modal-title"><i class="fa-solid fa-upload"></i> Unggah Surat Baru</span>
         <button class="modal-close" onclick="closeModal('uploadSuratModal')">✕</button>
       </div>
-      <div class="form-row">
+
+      <!-- TAB SELECTOR -->
+      <div style="display:flex;border-bottom:1px solid var(--border);background:#f8fafc;">
+        <button id="tabAiBtn" onclick="switchUploadTab('ai')"
+          style="flex:1;padding:12px;border:none;background:transparent;font-weight:700;font-size:0.9rem;color:#2563eb;border-bottom:2px solid #2563eb;cursor:pointer;">
+          <i class="fa-solid fa-robot"></i> Upload PDF Otomatis (AI)
+        </button>
+        <button id="tabManualBtn" onclick="switchUploadTab('manual')"
+          style="flex:1;padding:12px;border:none;background:transparent;font-weight:600;font-size:0.9rem;color:var(--text-secondary);cursor:pointer;">
+          <i class="fa-solid fa-pen-to-square"></i> Isi Manual
+        </button>
+      </div>
+
+      <!-- TAB AI: Upload PDF Otomatis -->
+      <div id="tabAi" style="padding:20px;">
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;text-align:center;">
+          Upload file PDF surat — AI akan membaca dan mengisi semua field secara otomatis.
+        </p>
+        <label class="file-upload-area" for="pdfAutoFile" id="pdfDropArea"
+          style="border:2px dashed #2563eb;background:#eff6ff;border-radius:10px;padding:32px;text-align:center;cursor:pointer;display:block;">
+          <i class="fa-solid fa-file-pdf" style="font-size:2.5rem;color:#2563eb;display:block;margin-bottom:10px;"></i>
+          <div id="pdfAutoFileName" style="font-weight:600;color:#1e40af;">Klik atau drag-drop file PDF di sini</div>
+          <div style="font-size:0.78rem;color:#64748b;margin-top:4px;">Hanya file PDF (maks 10MB)</div>
+          <input type="file" id="pdfAutoFile" accept=".pdf" style="display:none;" onchange="onPdfAutoSelect(this)">
+        </label>
+
+        <!-- Loading indicator -->
+        <div id="pdfAnalyzing" style="display:none;text-align:center;padding:20px;">
+          <i class="fa-solid fa-robot" style="font-size:1.5rem;color:#2563eb;"></i>
+          <p style="font-weight:600;color:#2563eb;margin-top:8px;">AI sedang membaca surat<span class="ai-analyzing-dots"><span>.</span><span>.</span><span>.</span></span></p>
+        </div>
+
+        <!-- Preview hasil ekstraksi -->
+        <div id="pdfPreview" style="display:none;margin-top:16px;">
+          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px;margin-bottom:14px;">
+            <i class="fa-solid fa-circle-check" style="color:#16a34a;"></i>
+            <span id="pdfAiLabel" style="font-weight:600;color:#15803d;margin-left:6px;">AI berhasil membaca surat</span>
+          </div>
+          <div style="display:grid;gap:10px;">
+            <div><label style="font-size:0.78rem;font-weight:700;color:#64748b;">NOMOR SURAT</label>
+              <input type="text" id="pdfNomor" class="form-control" style="margin-top:4px;" placeholder="Tidak terdeteksi — isi manual">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div><label style="font-size:0.78rem;font-weight:700;color:#64748b;">TANGGAL</label>
+                <input type="date" id="pdfTanggal" class="form-control" style="margin-top:4px;">
+              </div>
+              <div><label style="font-size:0.78rem;font-weight:700;color:#64748b;">KATEGORI (AI)</label>
+                <input type="text" id="pdfKategori" class="form-control" style="margin-top:4px;background:#f0fdf4;" readonly>
+              </div>
+            </div>
+            <div><label style="font-size:0.78rem;font-weight:700;color:#64748b;">PENGIRIM</label>
+              <input type="text" id="pdfPengirim" class="form-control" style="margin-top:4px;">
+            </div>
+            <div><label style="font-size:0.78rem;font-weight:700;color:#64748b;">PERIHAL</label>
+              <input type="text" id="pdfPerihal" class="form-control" style="margin-top:4px;">
+            </div>
+          </div>
+          <div class="form-actions" style="margin-top:16px;">
+            <button class="btn btn-outline" onclick="resetPdfTab()">Ganti File</button>
+            <button class="btn btn-primary" id="pdfSimpanBtn" onclick="submitPdfSurat()">
+              <i class="fa-solid fa-save"></i> Simpan ke Arsip
+            </button>
+          </div>
+        </div>
+
+        <!-- Fallback: PDF scan -->
+        <div id="pdfFallback" style="display:none;text-align:center;padding:16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;margin-top:16px;">
+          <i class="fa-solid fa-triangle-exclamation" style="color:#ea580c;font-size:1.2rem;"></i>
+          <p style="font-weight:600;color:#c2410c;margin:8px 0 4px;">PDF tidak bisa dibaca otomatis</p>
+          <p style="font-size:0.82rem;color:#9a3412;">Kemungkinan PDF hasil scan. Gunakan tab Isi Manual.</p>
+          <button class="btn btn-outline" style="margin-top:10px;" onclick="switchUploadTab('manual')">
+            Isi Manual <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB MANUAL: Form biasa -->
+      <div id="tabManual" style="display:none;padding:4px 20px 20px;">
+      <div class="form-row" style="margin-top:16px;">
         <div class="form-group">
           <label class="form-label">Nomor Surat *</label>
           <input type="text" class="form-control" id="uploadNomor" placeholder="Contoh: 420/123/DIS/IV/2026">
@@ -301,18 +396,13 @@
           oninput="scheduleAiClassify()">
         <div class="ai-suggest-box" id="aiSuggestBox">
           <span class="ai-label" id="aiSuggestText"><i class="fa-solid fa-robot"></i> Saran AI: -</span>
-          <button type="button" class="btn-apply-ai" onclick="applyAiSuggestion()">Terapkan Kategori</button>
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">Kategori * <span
-            style="font-weight:400;color:var(--text-secondary);font-size:0.8rem;">(bisa diisi otomatis oleh
-            AI)</span></label>
+            style="font-weight:400;color:var(--text-secondary);font-size:0.8rem;">(otomatis diisi oleh AI)</span></label>
         <select class="form-control" id="uploadKategori">
-          <option value="">-- Pilih Kategori --</option>
-          <option value="Undangan">Undangan</option>
-          <option value="Pemberitahuan">Pemberitahuan</option>
-          <option value="Keputusan">Keputusan</option>
+          <option value="">-- Mendeteksi kategori... --</option>
         </select>
       </div>
       <div class="form-group">
@@ -326,6 +416,7 @@
       <div class="form-actions">
         <button class="btn btn-outline" onclick="closeModal('uploadSuratModal')">Batal</button>
         <button class="btn btn-primary" onclick="submitUploadSurat()"><i class="fa-solid fa-save"></i> Simpan</button>
+      </div>
       </div>
     </div>
   </div>
@@ -506,7 +597,220 @@
       }
     }
 
-    function submitUploadSurat() {
+    // ── Tab Switch ──
+    function switchUploadTab(tab) {
+      const isAi = tab === 'ai';
+      document.getElementById('tabAi').style.display = isAi ? 'block' : 'none';
+      document.getElementById('tabManual').style.display = isAi ? 'none' : 'block';
+      const aiBtn = document.getElementById('tabAiBtn');
+      const manBtn = document.getElementById('tabManualBtn');
+      aiBtn.style.color = isAi ? '#2563eb' : 'var(--text-secondary)';
+      aiBtn.style.borderBottom = isAi ? '2px solid #2563eb' : 'none';
+      aiBtn.style.fontWeight = isAi ? '700' : '600';
+      manBtn.style.color = isAi ? 'var(--text-secondary)' : '#2563eb';
+      manBtn.style.borderBottom = isAi ? 'none' : '2px solid #2563eb';
+      manBtn.style.fontWeight = isAi ? '600' : '700';
+      if (!isAi) loadKategoriOptions();
+    }
+
+    // ── Tab AI: Pilih PDF → kirim ke backend → tampilkan preview ──
+    let pdfExtracted = null;
+
+    async function onPdfAutoSelect(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      document.getElementById('pdfAutoFileName').textContent = file.name;
+      document.getElementById('pdfDropArea').style.display = 'none';
+      document.getElementById('pdfAnalyzing').style.display = 'block';
+      document.getElementById('pdfPreview').style.display = 'none';
+      document.getElementById('pdfFallback').style.display = 'none';
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/surat/upload-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await res.json();
+        document.getElementById('pdfAnalyzing').style.display = 'none';
+
+        if (!data.readable) {
+          document.getElementById('pdfFallback').style.display = 'block';
+          return;
+        }
+
+        // Simpan hasil ke state
+        pdfExtracted = data;
+
+        // Isi preview fields
+        document.getElementById('pdfNomor').value    = data.nomor    || '';
+        document.getElementById('pdfTanggal').value  = data.tanggal  || '';
+        document.getElementById('pdfPengirim').value = data.pengirim || '';
+        document.getElementById('pdfPerihal').value  = data.perihal  || '';
+        document.getElementById('pdfKategori').value = data.kategori
+          ? `${data.kategori}${data.confidence ? ' (' + data.confidence + '%)' : ''} — ${data.model}`
+          : 'Model belum dilatih';
+
+        const lbl = data.kategori
+          ? `AI berhasil membaca surat — Kategori: <strong>${data.kategori}</strong>`
+          : 'AI membaca surat — kategori tidak terdeteksi (model belum dilatih)';
+        document.getElementById('pdfAiLabel').innerHTML = lbl;
+
+        document.getElementById('pdfPreview').style.display = 'block';
+      } catch (e) {
+        document.getElementById('pdfAnalyzing').style.display = 'none';
+        document.getElementById('pdfFallback').style.display = 'block';
+      }
+    }
+
+    async function submitPdfSurat() {
+      const nomor    = document.getElementById('pdfNomor').value.trim();
+      const tanggal  = document.getElementById('pdfTanggal').value;
+      const pengirim = document.getElementById('pdfPengirim').value.trim();
+      const perihal  = document.getElementById('pdfPerihal').value.trim();
+      const kategori = pdfExtracted?.kategori || '';
+      const file     = pdfExtracted?.file || 'surat.pdf';
+
+      if (!nomor) { showToast('Nomor surat belum terdeteksi — isi manual!', 'error'); return; }
+      if (!pengirim) { showToast('Pengirim belum terdeteksi — isi manual!', 'error'); return; }
+      if (!perihal) { showToast('Perihal belum terdeteksi — isi manual!', 'error'); return; }
+      if (!kategori) { showToast('Model AI belum dilatih — latih dulu di Pengaturan AI!', 'error'); return; }
+
+      const btn = document.getElementById('pdfSimpanBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+
+      try {
+        const response = await fetch('/api/surat/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nomor, tanggal, pengirim, perihal, kategori, file }),
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+          closeModal('uploadSuratModal');
+          showToast(`Surat berhasil diarsipkan! Kategori: ${kategori}`, 'success');
+          fetchSurat(showingAll ? Infinity : 5);
+          resetPdfTab();
+        } else {
+          showToast(res.message || 'Gagal menyimpan', 'error');
+        }
+      } catch (e) {
+        showToast('Terjadi kesalahan', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-save"></i> Simpan ke Arsip';
+      }
+    }
+
+    function resetPdfTab() {
+      pdfExtracted = null;
+      document.getElementById('pdfAutoFile').value = '';
+      document.getElementById('pdfAutoFileName').textContent = 'Klik atau drag-drop file PDF di sini';
+      document.getElementById('pdfDropArea').style.display = 'block';
+      document.getElementById('pdfPreview').style.display = 'none';
+      document.getElementById('pdfFallback').style.display = 'none';
+    }
+
+    let aiClassifyTimer = null;
+    let lastAiSuggestion = null;
+
+    // Load kategori dari database saat modal dibuka
+    async function loadKategoriOptions() {
+      try {
+        const res = await fetch('/api/kategori');
+        const list = await res.json();
+        const select = document.getElementById('uploadKategori');
+        select.innerHTML = '<option value="">-- AI akan mendeteksi otomatis --</option>';
+        list.forEach(k => {
+          const opt = document.createElement('option');
+          opt.value = k.nama;
+          opt.textContent = k.nama;
+          select.appendChild(opt);
+        });
+      } catch (e) { /* abaikan */ }
+    }
+
+    function scheduleAiClassify() {
+      const box = document.getElementById('aiSuggestBox');
+      const textEl = document.getElementById('aiSuggestText');
+      box.className = 'ai-suggest-box analyzing';
+      textEl.innerHTML = `<i class="fa-solid fa-robot"></i> AI menganalisis<span class="ai-analyzing-dots"><span>.</span><span>.</span><span>.</span></span>`;
+
+      clearTimeout(aiClassifyTimer);
+      aiClassifyTimer = setTimeout(runAiClassify, 700);
+    }
+
+    async function runAiClassify() {
+      const perihal = document.getElementById('uploadPerihal').value.trim();
+      const pengirim = document.getElementById('uploadPengirim').value.trim();
+      const box = document.getElementById('aiSuggestBox');
+      const textEl = document.getElementById('aiSuggestText');
+
+      if (!perihal) {
+        box.className = 'ai-suggest-box';
+        lastAiSuggestion = null;
+        document.getElementById('uploadKategori').value = '';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/ai/classify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ perihal, pengirim }),
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          lastAiSuggestion = data.kategori;
+          const conf = data.confidence ? ` ${data.confidence}%` : '';
+          const model = data.model_display || '';
+
+          // Otomatis isi dropdown kategori
+          const select = document.getElementById('uploadKategori');
+          const opts = Array.from(select.options).map(o => o.value);
+          if (opts.includes(data.kategori)) {
+            select.value = data.kategori;
+          } else {
+            // Tambah opsi baru jika belum ada
+            const opt = document.createElement('option');
+            opt.value = data.kategori;
+            opt.textContent = data.kategori;
+            select.appendChild(opt);
+            select.value = data.kategori;
+          }
+
+          // Tampilkan status di suggestion box (bukan tombol, langsung applied)
+          box.className = 'ai-suggest-box applied';
+          textEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> AI: <strong>${data.kategori}</strong>${conf} &mdash; <span style="font-weight:400;font-size:0.8rem;">${model}</span>`;
+        } else {
+          box.className = 'ai-suggest-box visible';
+          textEl.innerHTML = `<i class="fa-solid fa-robot"></i> AI: Model belum dilatih &mdash; pilih kategori manual`;
+          lastAiSuggestion = null;
+        }
+      } catch (e) {
+        box.className = 'ai-suggest-box';
+        lastAiSuggestion = null;
+      }
+    }
+
+    // Override openModal untuk load kategori saat modal upload dibuka
+    const _origOpenModal = typeof openModal === 'function' ? openModal : null;
+    function openUploadModal() {
+      openModal('uploadSuratModal');
+      // Default: buka Tab AI
+      switchUploadTab('ai');
+      resetPdfTab();
+      // Reset AI manual box
+      const box = document.getElementById('aiSuggestBox');
+      if (box) box.className = 'ai-suggest-box';
+      lastAiSuggestion = null;
+    }
+
+    async function submitUploadSurat() {
       const nomor = document.getElementById('uploadNomor').value.trim();
       const tanggal = document.getElementById('uploadTanggal').value;
       const pengirim = document.getElementById('uploadPengirim').value.trim();
@@ -518,6 +822,7 @@
         showToast('Harap isi semua field yang diperlukan!', 'error'); return;
       }
 
+      // Jika kategori belum dipilih, coba ambil dari saran AI
       if (!kategori) {
         if (lastAiSuggestion) {
           kategori = lastAiSuggestion;
@@ -530,7 +835,7 @@
             });
             const data = await res.json();
             if (data.status === 'success') kategori = data.kategori;
-          } catch (e) { /* ignore */ }
+          } catch (e) { /* abaikan */ }
         }
       }
 
@@ -539,27 +844,47 @@
       }
 
       const fileName = fileInput.files[0] ? fileInput.files[0].name : 'surat_baru.pdf';
-      const newLetter = { id: Date.now(), nomor, tanggal: tanggal.split('-').reverse().join('-'), pengirim, perihal, kategori, file: fileName };
-      addLetter(newLetter);
-      renderAdminSuratTable('suratTableBody', showingAll ? Infinity : 5);
-      closeModal('uploadSuratModal');
-      showToast('Surat berhasil diunggah!', 'success');
 
+      // Simpan ke database via API
+      try {
+        const response = await fetch('/api/surat/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nomor, tanggal, pengirim, perihal, kategori, file: fileName })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+          closeModal('uploadSuratModal');
+          showToast(`Surat berhasil diunggah! Kategori: ${kategori}`, 'success');
+          // Refresh tabel dari database
+          fetchSurat(showingAll ? Infinity : 5);
+        } else {
+          showToast(res.message || 'Gagal menyimpan surat', 'error');
+          return;
+        }
+      } catch (e) {
+        showToast('Terjadi kesalahan saat menyimpan surat', 'error');
+        return;
+      }
+
+      // Reset form
       document.getElementById('uploadNomor').value = '';
       document.getElementById('uploadTanggal').value = '';
       document.getElementById('uploadPengirim').value = '';
       document.getElementById('uploadPerihal').value = '';
       document.getElementById('uploadKategori').value = '';
       document.getElementById('uploadFileName').textContent = 'Klik untuk pilih file atau drag & drop disini';
+      document.getElementById('aiSuggestBox').classList.remove('visible');
+      lastAiSuggestion = null;
       fileInput.value = '';
     }
 
     function openEditSurat(id) {
-      const letter = getLetterById(id);
+      const letter = currentSuratList.find(l => l.id === id);
       if (!letter) return;
       document.getElementById('editSuratId').value = id;
       document.getElementById('editNomor').value = letter.nomor;
-      document.getElementById('editTanggal').value = letter.tanggal; // sudah format YYYY-MM-DD
+      document.getElementById('editTanggal').value = letter.tanggal;
       document.getElementById('editPengirim').value = letter.pengirim;
       document.getElementById('editPerihal').value = letter.perihal;
       document.getElementById('editKategori').value = letter.kategori;
@@ -623,7 +948,7 @@
     }
 
     function openDocumentViewer(id) {
-      const letter = getLetterById(id);
+      const letter = currentSuratList.find(l => l.id === id);
       if (!letter) return;
 
       document.getElementById('vNomor').textContent = letter.nomor;

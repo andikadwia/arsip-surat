@@ -4,7 +4,6 @@ from models import db, User, Kategori, Surat # Import database dari models.py
 from werkzeug.utils import secure_filename
 import ai_engine
 import os
-from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'rahasia_digisurat_2026' # Wajib ada untuk flash message/session
@@ -544,6 +543,74 @@ def ai_classify():
     if result.get('status') == 'error':
         return jsonify(result), 400
     return jsonify(result)
+
+
+# ── PROFIL USER ──────────────────────────────────────────────────────────────
+
+@app.route("/api/profile/stats", methods=["GET"])
+@login_required
+def profile_stats():
+    """Stat card di halaman profil: total surat, algoritma aktif, akurasi."""
+    try:
+        total_surat = Surat.query.count()
+        ai_status   = ai_engine.get_ai_status()
+        nb  = (ai_status.get('metrics') or {}).get('naive_bayes', {})
+        knn = (ai_status.get('metrics') or {}).get('knn', {})
+        best_acc  = max(nb.get('accuracy', 0), knn.get('accuracy', 0))
+        algo_name = ai_status.get('best_model', '').upper() or '-'
+        if algo_name == 'NAIVE_BAYES':
+            algo_name = 'Naive Bayes'
+        elif algo_name == 'KNN':
+            algo_name = 'K-NN'
+
+        return jsonify({
+            "total_surat": total_surat,
+            "algoritma":   algo_name if ai_status.get('trained') else '-',
+            "akurasi":     f"{best_acc*100:.0f}%" if ai_status.get('trained') else '-',
+        })
+    except Exception as e:
+        return jsonify({"total_surat": 0, "algoritma": "-", "akurasi": "-"})
+
+
+
+
+@app.route("/api/surat/upload-pdf", methods=["POST"])
+@login_required
+def upload_pdf_api():
+    """Terima PDF, ekstrak field surat otomatis menggunakan AI."""
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "File PDF wajib diunggah."}), 400
+
+    file = request.files['file']
+    if not file or not file.filename:
+        return jsonify({"status": "error", "message": "File tidak valid."}), 400
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext != '.pdf':
+        return jsonify({"status": "error", "message": "Hanya file PDF yang didukung."}), 400
+
+    # Simpan PDF sementara ke folder uploads
+    upload_folder = os.path.join(app.root_path, 'static', 'uploads')
+    os.makedirs(upload_folder, exist_ok=True)
+    filename = secure_filename(file.filename)
+    save_path = os.path.join(upload_folder, filename)
+    file.save(save_path)
+
+    # Ekstrak field dari PDF
+    fields = ai_engine.extract_pdf_fields(save_path)
+
+    return jsonify({
+        "status": "success",
+        "readable": fields['readable'],
+        "nomor":    fields['nomor'],
+        "tanggal":  fields['tanggal'],
+        "pengirim": fields['pengirim'],
+        "perihal":  fields['perihal'],
+        "kategori": fields['kategori'],
+        "model":    fields['model'],
+        "confidence": fields['confidence'],
+        "file":     filename,
+    })
 
 
 # ======================

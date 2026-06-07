@@ -211,15 +211,15 @@
         <div class="mini-stats-3">
           <div class="mini-stat-box">
             <div class="ms-lbl">Total Surat Dikelola</div>
-            <div class="ms-val" id="adminStatSurat">150</div>
+            <div class="ms-val" id="adminStatSurat">...</div>
           </div>
           <div class="mini-stat-box">
             <div class="ms-lbl">Algoritma Aktif</div>
-            <div class="ms-val" id="adminStatUser">Naive Bayes</div>
+            <div class="ms-val" id="adminStatAlgo">...</div>
           </div>
           <div class="mini-stat-box">
             <div class="ms-lbl">Akurasi Prediksi</div>
-            <div class="ms-val">82%</div>
+            <div class="ms-val" id="adminStatAkurasi">...</div>
           </div>
         </div>
       </div>
@@ -346,12 +346,26 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="../static/data.js"></script>
 <script src="../static/app.js"></script>
 <script>
   initPage('pengaturan-akun-admin');
 
-  let tempFoto = null;
+  // ── Load stat card dari API ──
+  async function loadProfileStats() {
+    try {
+      const res  = await fetch('/api/profile/stats');
+      const data = await res.json();
+      document.getElementById('adminStatSurat').textContent   = data.total_surat ?? '-';
+      document.getElementById('adminStatAlgo').textContent    = data.algoritma   ?? '-';
+      document.getElementById('adminStatAkurasi').textContent = data.akurasi     ?? '-';
+    } catch (e) {
+      document.getElementById('adminStatSurat').textContent   = '-';
+      document.getElementById('adminStatAlgo').textContent    = '-';
+      document.getElementById('adminStatAkurasi').textContent = '-';
+    }
+  }
+  loadProfileStats();
+
 
   document.getElementById('editProfilNama').value  = '{{ current_user.nama }}';
   document.getElementById('editProfilEmail').value = '{{ current_user.email }}';

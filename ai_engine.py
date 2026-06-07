@@ -1,12 +1,19 @@
 """
 DigiSurat AI Engine
 Pipeline: upload dataset → preprocess → TF-IDF → train NB & KNN → save .pkl
+Feature: extract_pdf_fields — otomatis baca teks PDF dan parsing field surat
 """
 
 import json
 import os
 import re
 from datetime import datetime
+
+try:
+    import pdfplumber  # type: ignore
+    _PDF_AVAILABLE = True
+except ImportError:
+    _PDF_AVAILABLE = False
 
 import joblib
 import numpy as np
@@ -370,3 +377,148 @@ def classify_text(text, model_name=None):
         'model_display': display_name,
         'confidence': confidence,
     }
+
+
+# ==============================================================================
+# PDF EXTRACTION — Baca teks PDF dan parsing field surat otomatis
+# ==============================================================================
+
+_BULAN_MAP = {
+    'januari': '01', 'februari': '02', 'maret': '03', 'april': '04',
+    'mei': '05', 'juni': '06', 'juli': '07', 'agustus': '08',
+    'september': '09', 'oktober': '10', 'november': '11', 'desember': '12',
+}
+
+_RE_NOMOR = re.compile(
+    r'(?:nomor|no\.?|number)\s*[:\-/]?\s*([A-Z0-9][\w\.\-/]{2,40})',
+    re.IGNORECASE,
+)
+_RE_TANGGAL_ID = re.compile(
+    r'\b(\d{1,2})\s+(januari|februari|maret|april|mei|juni|juli|agustus|'
+    r'september|oktober|november|desember)\s+(\d{4})\b',
+    re.IGNORECASE,
+)
+_RE_TANGGAL_NUM = re.compile(r'\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b')
+_RE_PERIHAL = re.compile(
+    r'(?:perihal|hal)\s*[:\-]\s*(.+)',
+    re.IGNORECASE,
+)
+_RE_DARI = re.compile(
+    r'(?:dari|pengirim|asal)\s*[:\-]\s*(.+)',
+    re.IGNORECASE,
+)
+
+
+def _parse_nomor(text: str) -> str:
+    m = _RE_NOMOR.search(text)
+    return m.group(1).strip() if m else ''
+
+
+def _parse_tanggal(text: str) -> str:
+    """Kembalikan format YYYY-MM-DD."""
+    m = _RE_TANGGAL_ID.search(text)
+    if m:
+        day = m.group(1).zfill(2)
+        month = _BULAN_MAP.get(m.group(2).lower(), '01')
+        year = m.group(3)
+        return f'{year}-{month}-{day}'
+    m2 = _RE_TANGGAL_NUM.search(text)
+    if m2:
+        d, mo, y = m2.group(1).zfill(2), m2.group(2).zfill(2), m2.group(3)
+        return f'{y}-{mo}-{d}'
+    return ''
+
+
+def _parse_perihal(text: str) -> str:
+    m = _RE_PERIHAL.search(text)
+    if m:
+        val = m.group(1).strip()
+        # Ambil hanya baris pertama
+        return val.split('\n')[0].strip()[:200]
+    return ''
+
+
+def _parse_pengirim(lines: list[str]) -> str:
+    """
+    Heuristik: cari pola 'Dari:' atau ambil baris kop surat
+    (baris pertama yang mengandung kata institusi umum).
+    """
+    text_all = '\n'.join(lines)
+    m = _RE_DARI.search(text_all)
+    if m:
+        return m.group(1).split('\n')[0].strip()[:150]
+    # Ambil baris non-kosong pertama sebagai kop surat
+    for line in lines[:10]:
+        line = line.strip()
+        if len(line) > 5 and not line.isdigit():
+            return line[:150]
+    return ''
+
+
+def extract_pdf_fields(file_path: str) -> dict:
+    """
+    Baca PDF, ekstrak teks, parsing field surat secara otomatis.
+
+    Returns dict:
+        {
+            'readable': bool,
+            'nomor': str,
+            'tanggal': str,   # format YYYY-MM-DD
+            'pengirim': str,
+            'perihal': str,
+            'kategori': str,
+            'model': str,
+            'confidence': float | None,
+            'raw_text': str,  # 500 karakter pertama untuk debug
+        }
+    """
+    result = {
+        'readable': False,
+        'nomor': '',
+        'tanggal': '',
+        'pengirim': '',
+        'perihal': '',
+        'kategori': '',
+        'model': '',
+        'confidence': None,
+        'raw_text': '',
+    }
+
+    if not _PDF_AVAILABLE:
+        return result
+
+    try:
+        full_text = ''
+        all_lines: list[str] = []
+
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages[:5]:   # baca maks 5 halaman
+                page_text = page.extract_text() or ''
+                full_text += page_text + '\n'
+                all_lines.extend(page_text.splitlines())
+
+        full_text = full_text.strip()
+        if not full_text:
+            return result   # PDF scan / tidak terbaca
+
+        result['readable'] = True
+        result['raw_text'] = full_text[:500]
+
+        result['nomor']    = _parse_nomor(full_text)
+        result['tanggal']  = _parse_tanggal(full_text)
+        result['pengirim'] = _parse_pengirim(all_lines)
+        result['perihal']  = _parse_perihal(full_text)
+
+        # Klasifikasi AI berdasarkan perihal + pengirim
+        text_for_ai = f"{result['pengirim']} {result['perihal']}".strip()
+        if text_for_ai:
+            ai_result = classify_text(text_for_ai)
+            if ai_result.get('status') == 'success':
+                result['kategori']   = ai_result.get('kategori', '')
+                result['model']      = ai_result.get('model_display', '')
+                result['confidence'] = ai_result.get('confidence')
+
+    except Exception:
+        pass  # kembalikan result kosong jika ada error
+
+    return result

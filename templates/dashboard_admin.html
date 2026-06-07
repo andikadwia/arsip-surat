@@ -207,13 +207,10 @@
 
     <main class="main-content">
       <div class="stats-grid">
-        <div class="stat-card"><span class="stat-label">Total Surat</span><span class="stat-value"
-            id="statTotalSurat">0</span></div>
-        <div class="stat-card"><span class="stat-label">Total User</span><span class="stat-value"
-            id="statTotalUser">2</span></div>
-        <div class="stat-card"><span class="stat-label">Akurasi Tertinggi</span><span class="stat-value">85%</span>
-        </div>
-        <div class="stat-card"><span class="stat-label">Data Latih</span><span class="stat-value">150 Surat</span></div>
+        <div class="stat-card"><span class="stat-label">Total Surat</span><span class="stat-value" id="statTotalSurat">...</span></div>
+        <div class="stat-card"><span class="stat-label">Total User</span><span class="stat-value" id="statTotalUser">...</span></div>
+        <div class="stat-card"><span class="stat-label">Akurasi Tertinggi</span><span class="stat-value" id="statAkurasi">-</span></div>
+        <div class="stat-card"><span class="stat-label">Data Latih</span><span class="stat-value" id="statDataLatih">-</span></div>
       </div>
 
       <div class="arsip-panel" style="margin-bottom: 24px;">
@@ -242,7 +239,7 @@
       </div>
 
       <div class="arsip-panel">
-        <a href="perbandingan_algoritma.html"
+        <a href="/perbandingan_algoritma"
           style="text-decoration: none; display: block; transition: background 0.2s; padding: 28px 24px; background: #fff;"
           onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
           <div class="algo-legend-wide">
@@ -351,18 +348,88 @@
 
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="../static/data.js"></script>
   <script src="../static/app.js"></script>
   <script>
     initPage('dashboard-admin');
-    renderDashboardTable('dashboardTableBody', false);
-    document.getElementById('statTotalSurat').textContent = getLetters().length;
-    document.getElementById('statTotalUser').textContent = getUsers().length;
 
-    function toggleDropdown() {
-      document.getElementById('dropdownMenu').classList.toggle('open');
+    // ── Tabel Arsip Surat dari API ──
+    async function loadDashboardTable() {
+      try {
+        const res = await fetch('/api/surat');
+        const data = await res.json();
+        const tbody = document.getElementById('dashboardTableBody');
+        const latest = data.slice(0, 5);
+        if (latest.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted);"><i class="fa-solid fa-inbox" style="font-size:1.5rem;display:block;margin-bottom:8px;"></i>Belum ada data surat</td></tr>`;
+        } else {
+          tbody.innerHTML = latest.map((l, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td style="font-size:0.83rem;">${l.nomor}</td>
+              <td>${l.tanggal}</td>
+              <td style="font-size:0.83rem;">${l.pengirim}</td>
+              <td style="font-size:0.83rem;">${l.perihal}</td>
+              <td><span class="badge-info">${l.kategori}</span></td>
+              <td style="font-size:0.83rem;color:var(--accent);"><i class="fa-regular fa-file-pdf"></i> ${l.file}</td>
+            </tr>`).join('');
+        }
+        document.getElementById('statTotalSurat').textContent = data.length;
+      } catch (e) {
+        document.getElementById('statTotalSurat').textContent = '-';
+      }
     }
-  </script>
-</body>
 
-</html>
+    // ── Total User dari API ──
+    async function loadUserCount() {
+      try {
+        const res = await fetch('/api/users');
+        const data = await res.json();
+        document.getElementById('statTotalUser').textContent = data.length;
+      } catch (e) {
+        document.getElementById('statTotalUser').textContent = '-';
+      }
+    }
+
+    // ── Metrik AI + Grafik dari API ──
+    function setDashBar(group, algo, value) {
+      const bar = group.querySelector('.bar.' + algo);
+      const label = group.querySelector('.' + algo + '-val');
+      bar.style.height = '0%';
+      const h = value != null ? Math.max(value * 100, 2) : 0;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          bar.style.height = h + '%';
+          label.textContent = value != null ? (value * 100).toFixed(1) + '%' : '-';
+        });
+      });
+    }
+
+    async function loadAiStats() {
+      try {
+        const res = await fetch('/api/ai/status');
+        const data = await res.json();
+        const nb  = data.metrics?.naive_bayes || {};
+        const knn = data.metrics?.knn || {};
+        const best = Math.max(nb.accuracy || 0, knn.accuracy || 0);
+
+        document.getElementById('statAkurasi').textContent =
+          data.trained ? (best * 100).toFixed(0) + '%' : '-';
+        document.getElementById('statDataLatih').textContent =
+          data.trained ? data.total_samples + ' Surat' : '-';
+
+        ['accuracy', 'precision', 'recall', 'f1'].forEach(metric => {
+          const group = document.querySelector('#dashMetricGrid [data-metric="' + metric + '"]');
+          if (group) {
+            setDashBar(group, 'nb', nb[metric]);
+            setDashBar(group, 'knn', knn[metric]);
+          }
+        });
+      } catch (e) { /* abaikan */ }
+    }
+
+    // ── Jalankan semua ──
+    loadDashboardTable();
+    loadUserCount();
+    loadAiStats();
+  </script>
+</body>
