@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, jsonify, flash
+from flask import Flask, render_template, redirect, url_for, request, jsonify, flash, send_from_directory, abort, make_response
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import db, User, Kategori, Surat # Import database dari models.py
 from werkzeug.utils import secure_filename
@@ -238,23 +238,68 @@ def update_password_api():
 # API MANAJEMEN SURAT (CRUD KE MYSQL)
 # ======================
 
+def _normalize_surat_file_path(file_value):
+    if not file_value:
+        return 'static/uploads/surat_baru.pdf'
+    file_value = str(file_value).replace('\\', '/').strip()
+    if file_value.startswith('static/uploads/'):
+        return file_value
+    return f'static/uploads/{os.path.basename(file_value)}'
+
+
+def _send_surat_file(surat, as_attachment=False):
+    file_path = _normalize_surat_file_path(surat.file_path)
+    abs_path = os.path.join(app.root_path, file_path.replace('/', os.sep))
+    if not os.path.isfile(abs_path):
+        abort(404, description='File surat tidak ditemukan di server.')
+    directory = os.path.dirname(abs_path)
+    filename = os.path.basename(abs_path)
+    response = make_response(send_from_directory(
+        directory,
+        filename,
+        mimetype='application/pdf',
+        as_attachment=as_attachment,
+        download_name=filename if as_attachment else None,
+    ))
+    disposition = 'attachment' if as_attachment else 'inline'
+    response.headers['Content-Disposition'] = f'{disposition}; filename="{filename}"'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+def _serialize_surat(s):
+    kategori_nama = s.kategori_rel.nama if s.kategori_rel else "Lainnya"
+    file_path = _normalize_surat_file_path(s.file_path)
+    return {
+        "id": s.id,
+        "nomor": s.nomor_surat,
+        "tanggal": s.tanggal_surat.strftime("%Y-%m-%d"),
+        "pengirim": s.pengirim,
+        "perihal": s.perihal,
+        "kategori": kategori_nama,
+        "file": file_path,
+        "file_path": file_path,
+        "created_at": s.created_at.isoformat() if s.created_at else None,
+    }
+
+
 @app.route("/api/surat", methods=["GET"])
 @login_required
 def get_surat_api():
     surat_list = Surat.query.order_by(Surat.created_at.desc()).all()
-    output = []
-    for s in surat_list:
-        kategori_nama = s.kategori_rel.nama if s.kategori_rel else "Lainnya"
-        output.append({
-            "id": s.id,
-            "nomor": s.nomor_surat,
-            "tanggal": s.tanggal_surat.strftime("%Y-%m-%d"),
-            "pengirim": s.pengirim,
-            "perihal": s.perihal,
-            "kategori": kategori_nama,
-            "file": s.file_path
-        })
-    return jsonify(output)
+    return jsonify([_serialize_surat(s) for s in surat_list])
+
+
+@app.route("/api/surat/sync", methods=["GET"])
+@login_required
+def surat_sync_api():
+    """Endpoint ringan untuk polling perubahan arsip surat antar dashboard."""
+    latest = Surat.query.order_by(Surat.created_at.desc()).first()
+    return jsonify({
+        "count": Surat.query.count(),
+        "latest_id": latest.id if latest else 0,
+        "latest_at": latest.created_at.isoformat() if latest and latest.created_at else None,
+    })
 
 @app.route("/api/surat/add", methods=["POST"])
 @login_required
@@ -277,7 +322,7 @@ def add_surat_api():
             tanggal_surat=tgl_obj,
             pengirim=data['pengirim'],
             perihal=data['perihal'],
-            file_path=data.get('file', 'surat_baru.pdf'),
+            file_path=_normalize_surat_file_path(data.get('file', 'surat_baru.pdf')),
             kategori_id=kat.id
         )
         db.session.add(new_surat)
@@ -310,7 +355,7 @@ def edit_surat_api(id):
             surat.perihal = data['perihal']
             surat.kategori_id = kat.id
             if 'file' in data and data['file']:
-                surat.file_path = data['file']
+                surat.file_path = _normalize_surat_file_path(data['file'])
             
             db.session.commit()
             return jsonify({"status": "success", "message": "Surat berhasil diperbarui"})
@@ -327,6 +372,22 @@ def delete_surat_api(id):
         db.session.commit()
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Surat tidak ditemukan"})
+
+
+@app.route("/api/surat/view/<int:id>")
+@login_required
+def view_surat_file(id):
+    """Buka file PDF surat langsung di browser."""
+    surat = Surat.query.get_or_404(id)
+    return _send_surat_file(surat, as_attachment=False)
+
+
+@app.route("/api/surat/download/<int:id>")
+@login_required
+def download_surat_file(id):
+    """Unduh file PDF surat."""
+    surat = Surat.query.get_or_404(id)
+    return _send_surat_file(surat, as_attachment=True)
 
 # ======================
 # API MANAJEMEN KATEGORI
@@ -609,7 +670,7 @@ def upload_pdf_api():
         "kategori": fields['kategori'],
         "model":    fields['model'],
         "confidence": fields['confidence'],
-        "file":     filename,
+        "file":     _normalize_surat_file_path(filename),
     })
 
 

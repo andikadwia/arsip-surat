@@ -389,8 +389,17 @@ _BULAN_MAP = {
     'september': '09', 'oktober': '10', 'november': '11', 'desember': '12',
 }
 
-_RE_NOMOR = re.compile(
-    r'(?:nomor|no\.?|number)\s*[:\-/]?\s*([A-Z0-9][\w\.\-/]{2,40})',
+# Harus di awal baris + boundary agar tidak match "NO" di "TEKNOLOGI"
+_RE_NOMOR_LABELED = re.compile(
+    r'(?:^|\n)\s*(?:nomor(?:\s+surat)?|no\.)\s*:?\s*(.+)',
+    re.IGNORECASE,
+)
+_RE_NOMOR_SLASH = re.compile(
+    r'\b(\d{1,4}/[A-Z0-9][\w\.\-]*/[\w\.\-/]+(?:/\d{4})?)\b',
+    re.IGNORECASE,
+)
+_RE_NOMOR_PREFIX = re.compile(
+    r'\b([A-Z]{1,10}-?\d{1,4}/[\w\.\-/]+(?:/[\w\.\-/]+)*)\b',
     re.IGNORECASE,
 )
 _RE_TANGGAL_ID = re.compile(
@@ -409,9 +418,29 @@ _RE_DARI = re.compile(
 )
 
 
+def _clean_nomor_value(raw: str) -> str:
+    val = raw.strip()
+    val = _RE_TANGGAL_ID.sub('', val).strip()
+    val = _RE_TANGGAL_NUM.sub('', val).strip()
+    val = re.sub(r'\s*/\s*', '/', val)
+    val = re.sub(r'/\s+', '/', val)
+    return val.strip(' .,-')[:100]
+
+
 def _parse_nomor(text: str) -> str:
-    m = _RE_NOMOR.search(text)
-    return m.group(1).strip() if m else ''
+    for m in _RE_NOMOR_LABELED.finditer(text):
+        val = _clean_nomor_value(m.group(1).split('\n')[0])
+        if len(val) >= 3 and not val.lower().startswith('lampiran'):
+            return val
+
+    header = text[:1500]
+    for pattern in (_RE_NOMOR_PREFIX, _RE_NOMOR_SLASH):
+        m = pattern.search(header)
+        if m:
+            val = _clean_nomor_value(m.group(1))
+            if len(val) >= 5:
+                return val
+    return ''
 
 
 def _parse_tanggal(text: str) -> str:

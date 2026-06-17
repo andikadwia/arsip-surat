@@ -275,6 +275,106 @@ function downloadSurat(id) {
   }
 }
 
+/* ---- Surat sync & file helpers ---- */
+function resolveSuratFileUrl(filePath) {
+  if (!filePath) return '';
+  const normalized = String(filePath).replace(/\\/g, '/');
+  if (/^https?:\/\//i.test(normalized)) return normalized;
+  return normalized.startsWith('/') ? normalized : '/' + normalized;
+}
+
+function suratFileName(filePath) {
+  if (!filePath) return 'surat.pdf';
+  return String(filePath).replace(/\\/g, '/').split('/').pop() || 'surat.pdf';
+}
+
+function suratViewUrl(id) {
+  return `/api/surat/view/${id}`;
+}
+
+function suratDownloadUrl(id) {
+  return `/api/surat/download/${id}`;
+}
+
+function buildSuratFileUrl(filePath, suratId) {
+  if (filePath) {
+    return new URL(resolveSuratFileUrl(filePath), window.location.origin).href;
+  }
+  if (suratId) {
+    return new URL(suratViewUrl(suratId), window.location.origin).href;
+  }
+  return '';
+}
+
+function openSuratPdf(suratId, filePath) {
+  const url = buildSuratFileUrl(filePath, suratId);
+  if (!url) {
+    showToast('File tidak tersedia', 'error');
+    return;
+  }
+  const link = document.createElement('a');
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function downloadSuratPdf(suratId, filePath) {
+  const staticUrl = filePath ? buildSuratFileUrl(filePath, null) : '';
+  const url = staticUrl || (suratId ? new URL(suratDownloadUrl(suratId), window.location.origin).href : '');
+  if (!url) {
+    showToast('File tidak tersedia', 'error');
+    return;
+  }
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = suratFileName(filePath);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function renderSuratFileLink(filePath, label) {
+  const url = resolveSuratFileUrl(filePath);
+  if (!url) return '-';
+  const text = label || suratFileName(filePath);
+  return `<a href="${url}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;"><i class="fa-solid fa-file-pdf"></i> ${text}</a>`;
+}
+
+let _suratSyncTimer = null;
+let _lastSuratSync = { count: -1, latest_id: -1 };
+
+async function pollSuratSync(onChange) {
+  try {
+    const res = await fetch('/api/surat/sync');
+    if (!res.ok) return;
+    const data = await res.json();
+    const changed = data.count !== _lastSuratSync.count
+      || data.latest_id !== _lastSuratSync.latest_id;
+    if (changed) {
+      _lastSuratSync = {
+        count: data.count,
+        latest_id: data.latest_id,
+      };
+      if (typeof onChange === 'function') await onChange(data);
+    }
+  } catch (e) { /* abaikan */ }
+}
+
+function startSuratRealtimeSync(onChange, intervalMs = 4000) {
+  pollSuratSync(onChange);
+  if (_suratSyncTimer) clearInterval(_suratSyncTimer);
+  _suratSyncTimer = setInterval(() => pollSuratSync(onChange), intervalMs);
+  window.addEventListener('digisurat:surat-changed', () => pollSuratSync(onChange));
+}
+
+function notifySuratChanged() {
+  _lastSuratSync = { count: -1, latest_id: -1 };
+  window.dispatchEvent(new CustomEvent('digisurat:surat-changed'));
+}
+
 /* ---- Init Page ---- */
 function initPage(pageName) {
   // Escape key closes modals

@@ -694,6 +694,7 @@
           closeModal('uploadSuratModal');
           showToast(`Surat berhasil diarsipkan! Kategori: ${kategori}`, 'success');
           fetchSurat(showingAll ? Infinity : 5);
+          notifySuratChanged();
           resetPdfTab();
         } else {
           showToast(res.message || 'Gagal menyimpan', 'error');
@@ -856,8 +857,8 @@
         if (res.status === 'success') {
           closeModal('uploadSuratModal');
           showToast(`Surat berhasil diunggah! Kategori: ${kategori}`, 'success');
-          // Refresh tabel dari database
           fetchSurat(showingAll ? Infinity : 5);
+          notifySuratChanged();
         } else {
           showToast(res.message || 'Gagal menyimpan surat', 'error');
           return;
@@ -915,6 +916,7 @@
           closeModal('editSuratModal');
           showToast('Surat berhasil diperbarui!', 'success');
           fetchSurat(showingAll ? Infinity : 5);
+          notifySuratChanged();
         } else {
           showToast(res.message, 'error');
         }
@@ -939,6 +941,7 @@
           closeModal('deleteSuratModal');
           showToast('Surat berhasil dihapus!', 'success');
           fetchSurat(showingAll ? Infinity : 5);
+          notifySuratChanged();
         } else {
           showToast(res.message, 'error');
         }

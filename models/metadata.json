@@ -1,7 +1,7 @@
 {
   "trained": true,
-  "last_trained": "07 June 2026, 22:14",
-  "total_samples": 60,
+  "last_trained": "14 June 2026, 13:51",
+  "total_samples": 150,
   "config": {
     "vectorizer": "tfidf",
     "knn_k": 5,
@@ -11,25 +11,25 @@
   },
   "metrics": {
     "naive_bayes": {
-      "accuracy": 0.5,
-      "precision": 0.6444,
-      "recall": 0.5,
-      "f1": 0.4889
+      "accuracy": 0.8333,
+      "precision": 0.8604,
+      "recall": 0.8333,
+      "f1": 0.8379
     },
     "knn": {
-      "accuracy": 0.5833,
-      "precision": 0.6667,
-      "recall": 0.5833,
-      "f1": 0.5926
+      "accuracy": 0.7,
+      "precision": 0.7103,
+      "recall": 0.7,
+      "f1": 0.685
     }
   },
-  "best_model": "knn",
+  "best_model": "naive_bayes",
   "labels": [
     "Keputusan",
     "Pemberitahuan",
     "Undangan"
   ],
-  "dataset_file": "sample_dataset.csv",
+  "dataset_file": "training_dataset_150.csv",
   "last_trained_target": [
     "knn",
     "naive_bayes"

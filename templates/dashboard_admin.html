@@ -64,6 +64,34 @@
       background: #53647a;
     }
 
+    .live-sync-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #15803d;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 999px;
+      padding: 4px 10px;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+
+    .live-sync-badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse-live 1.5s infinite;
+    }
+
+    @keyframes pulse-live {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+
     .chart-wrap {
       margin: 0 auto;
       margin-top: 16px;
@@ -214,7 +242,10 @@
       </div>
 
       <div class="arsip-panel" style="margin-bottom: 24px;">
-        <div class="arsip-panel-title">Daftar Arsip Surat Terbaru</div>
+        <div class="arsip-panel-title">
+          Daftar Arsip Surat Terbaru
+          <span class="live-sync-badge" id="liveSyncBadge"><span class="dot"></span> Live</span>
+        </div>
 
         <a href="/manajemen_surat"
           style="text-decoration: none; color: inherit; display: block; background: #fff; transition: background 0.2s;"
@@ -353,7 +384,7 @@
     initPage('dashboard-admin');
 
     // ── Tabel Arsip Surat dari API ──
-    async function loadDashboardTable() {
+    async function loadDashboardTable(showNotice) {
       try {
         const res = await fetch('/api/surat');
         const data = await res.json();
@@ -370,10 +401,11 @@
               <td style="font-size:0.83rem;">${l.pengirim}</td>
               <td style="font-size:0.83rem;">${l.perihal}</td>
               <td><span class="badge-info">${l.kategori}</span></td>
-              <td style="font-size:0.83rem;color:var(--accent);"><i class="fa-regular fa-file-pdf"></i> ${l.file}</td>
+              <td style="font-size:0.83rem;color:var(--accent);"><i class="fa-regular fa-file-pdf"></i> ${suratFileName(l.file || l.file_path)}</td>
             </tr>`).join('');
         }
         document.getElementById('statTotalSurat').textContent = data.length;
+        if (showNotice) showToast('Arsip surat diperbarui', 'info');
       } catch (e) {
         document.getElementById('statTotalSurat').textContent = '-';
       }
@@ -431,5 +463,6 @@
     loadDashboardTable();
     loadUserCount();
     loadAiStats();
+    startSuratRealtimeSync(() => loadDashboardTable(true));
   </script>
-</body>
+</body>

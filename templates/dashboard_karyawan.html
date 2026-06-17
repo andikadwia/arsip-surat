@@ -76,14 +76,44 @@
     .arsip-table-wrap { background: #fff; overflow-x: auto; }
 
     /* Unduh action dalam tabel */
-    .tbl-unduh-btn {
+    .tbl-unduh-btn,
+    .tbl-lihat-btn {
       display: inline-flex; align-items: center; gap: 5px;
       font-size: 0.82rem; font-weight: 600;
       color: var(--text-primary); background: none; border: none;
       cursor: pointer; padding: 4px 6px;
-      transition: color 0.2s;
+      transition: color 0.2s; text-decoration: none;
     }
-    .tbl-unduh-btn:hover { color: var(--accent); }
+    .tbl-unduh-btn:hover,
+    .tbl-lihat-btn:hover { color: var(--accent); }
+
+    .live-sync-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #15803d;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 999px;
+      padding: 4px 10px;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+
+    .live-sync-badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse-live 1.5s infinite;
+    }
+
+    @keyframes pulse-live {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
   </style>
 </head>
 <body>
@@ -159,7 +189,10 @@
     </div>
 
     <div class="arsip-panel">
-      <div class="arsip-panel-title">Daftar Surat Arsip</div>
+      <div class="arsip-panel-title">
+        Daftar Surat Arsip
+        <span class="live-sync-badge"><span class="dot"></span> Live</span>
+      </div>
       <div class="arsip-table-wrap">
         <table class="data-table" id="karyawanTable">
           <thead>
@@ -242,8 +275,9 @@
   initPage('dashboard-karyawan');
   
   let allSurat = [];
+  let showingAll = false;
   
-  async function loadDashboardKaryawanData() {
+  async function loadDashboardKaryawanData(showNotice) {
     try {
       const [resSurat, resUser, resAi] = await Promise.all([
         fetch('/api/surat'),
@@ -254,12 +288,11 @@
       const dataUser  = await resUser.json();
       const dataAi    = await resAi.json();
 
-      allSurat = [...dataSurat].reverse();
+      allSurat = dataSurat;
 
       document.getElementById('statTotalSurat').textContent = dataSurat.length;
       document.getElementById('statTotalUser').textContent  = dataUser.length;
 
-      // Stat AI
       if (dataAi.trained) {
         const nb  = dataAi.metrics?.naive_bayes || {};
         const knn = dataAi.metrics?.knn || {};
@@ -271,13 +304,24 @@
         document.getElementById('statDataLatih').textContent = '-';
       }
 
-      renderTableKaryawan(5);
+      renderTableKaryawan(showingAll ? null : 5);
+      if (showNotice) showToast('Daftar surat diperbarui', 'info');
     } catch (e) {
       console.error(e);
       showToast('Gagal memuat data dashboard', 'error');
     }
   }
   
+  function openSuratPdfById(suratId) {
+    const surat = allSurat.find(s => s.id === suratId);
+    openSuratPdf(suratId, surat ? (surat.file || surat.file_path) : '');
+  }
+
+  function downloadSuratPdfById(suratId) {
+    const surat = allSurat.find(s => s.id === suratId);
+    downloadSuratPdf(suratId, surat ? (surat.file || surat.file_path) : '');
+  }
+
   function renderTableKaryawan(limit) {
     const tbody = document.getElementById('karyawanTableBody');
     const items = limit ? allSurat.slice(0, limit) : allSurat;
@@ -287,7 +331,10 @@
       return;
     }
     
-    tbody.innerHTML = items.map((l, i) => `
+    tbody.innerHTML = items.map((l, i) => {
+      const filePath = l.file || l.file_path;
+      const hasFile = Boolean(filePath);
+      return `
       <tr>
         <td>${i + 1}</td>
         <td>${l.nomor}</td>
@@ -295,17 +342,23 @@
         <td>${l.pengirim}</td>
         <td>${l.perihal}</td>
         <td><span class="badge-info">${l.kategori}</span></td>
-        <td>${l.file_path ? `<a href="/${l.file_path}" target="_blank" style="color:var(--accent); font-weight:600;"><i class="fa-solid fa-file-pdf"></i> Lihat</a>` : '-'}</td>
         <td>
-            <a href="${l.file_path ? '/' + l.file_path : '#'}" download="${l.file_path ? l.file_path.split('/').pop() : ''}" class="tbl-unduh-btn" onclick="${l.file_path ? '' : 'event.preventDefault(); showToast(\\'File tidak tersedia\\', \\'error\\');'}">
-              <i class="fa-solid fa-download"></i> Unduh
-            </a>
+          ${hasFile
+            ? `<button type="button" class="tbl-lihat-btn" onclick="openSuratPdfById(${l.id})"><i class="fa-solid fa-eye"></i> Lihat</button>`
+            : '-'}
+        </td>
+        <td>
+          ${hasFile
+            ? `<button type="button" class="tbl-unduh-btn" onclick="downloadSuratPdfById(${l.id})"><i class="fa-solid fa-download"></i> Unduh</button>`
+            : `<button type="button" class="tbl-unduh-btn" onclick="showToast('File tidak tersedia', 'error')"><i class="fa-solid fa-download"></i> Unduh</button>`}
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
   }
 
   loadDashboardKaryawanData();
+  startSuratRealtimeSync(() => loadDashboardKaryawanData(true));
 
   function filterTable() {
     const q = document.getElementById('searchInput').value.toLowerCase();
@@ -314,7 +367,6 @@
     });
   }
 
-  let showingAll = false;
   function showAllKaryawan(e) {
     e.preventDefault();
     if (!showingAll) {
