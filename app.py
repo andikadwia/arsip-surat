@@ -1,15 +1,16 @@
 from flask import Flask, render_template, redirect, url_for, request, jsonify, flash, send_from_directory, abort, make_response
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-from models import db, User, Kategori, Surat # Import database dari models.py
+from models import db, User, Kategori, Surat, AktivitasLog # Import database dari models.py
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 import ai_engine
 import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'rahasia_digisurat_2026' # Wajib ada untuk flash message/session
 
-# Konfigurasi Database (MySQL)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/digisurat_db'
+# Konfigurasi Database (SQLite)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///digisurat.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Hubungkan app dengan database
@@ -25,6 +26,48 @@ login_manager.login_view = 'index' # Jika belum login, dilempar ke rute 'index' 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+from flask import session
+
+@app.before_request
+def handle_multi_tab_sessions():
+    if not session.get('multi_tab_active'):
+        return
+
+    admin_routes = ['dashboard_admin', 'manajemen_surat', 'kategori_surat', 'laporan_arsip', 'manajemen_user', 'pengaturan_ai', 'perbandingan_algoritma', 'pengaturan_akun_admin']
+    karyawan_routes = ['dashboard_karyawan', 'pengaturan_akun']
+    
+    expected_role = None
+    
+    if request.endpoint in admin_routes:
+        expected_role = 'Admin'
+    elif request.endpoint in karyawan_routes:
+        expected_role = 'Karyawan'
+    elif request.referrer:
+        if any(f"/{r}" in request.referrer for r in admin_routes):
+            expected_role = 'Admin'
+        elif any(f"/{r}" in request.referrer for r in karyawan_routes):
+            expected_role = 'Karyawan'
+
+    if expected_role:
+        uid = session.get(f'uid_{expected_role}')
+        if uid:
+            if session.get('_user_id') != str(uid):
+                user = User.query.get(uid)
+                if user:
+                    login_user(user)
+
+# ======================
+# HELPER LOG AKTIVITAS
+# ======================
+def log_aktivitas(user_id, kegiatan, status='Sukses'):
+    try:
+        new_log = AktivitasLog(user_id=user_id, kegiatan=kegiatan, status=status)
+        db.session.add(new_log)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Gagal mencatat aktivitas: {e}")
 
 # ======================
 # ROUTE UTAMA & AUTH
@@ -48,8 +91,14 @@ def login():
     user = User.query.filter_by(email=email).first()
 
     # Cek apakah user ada DAN password cocok
-    if user and user.password == password:
+    if user and check_password_hash(user.password, password):
+        session['multi_tab_active'] = True
+        session[f'uid_{user.role}'] = user.id
         login_user(user) # Daftarkan sesi user
+        
+        # Catat aktivitas login
+        log_aktivitas(user.id, "Login ke sistem", "Sukses")
+
         if user.role == 'Admin':
             return redirect(url_for("dashboard_admin"))
         else:
@@ -61,65 +110,96 @@ def login():
 @app.route("/logout")
 @login_required
 def logout():
+    if current_user.is_authenticated:
+        role = current_user.role
+        user_id = current_user.id
+        session.pop(f'uid_{role}', None)
+        
+        # Catat aktivitas logout
+        log_aktivitas(user_id, "Logout dari sistem", "Sukses")
+        
     logout_user() # Hapus sesi user
+    
+    if not session.get('uid_Admin') and not session.get('uid_Karyawan'):
+        session.pop('multi_tab_active', None)
+        
     return redirect(url_for("index"))
 
 # ======================
-# MENU ADMIN (Terproteksi)
+# MENU ADMIN (Terproteksi Ketat)
 # ======================
 @app.route("/dashboard_admin")
 @login_required
 def dashboard_admin():
+    if current_user.role != 'Admin':
+        return redirect(url_for('dashboard_karyawan'))
     return render_template("dashboard_admin.html")
 
 @app.route("/manajemen_surat")
 @login_required
 def manajemen_surat():
+    if current_user.role != 'Admin':
+        return redirect(url_for('dashboard_karyawan'))
     return render_template("manajemen_surat.html")
 
 @app.route("/kategori_surat")
 @login_required
 def kategori_surat():
+    if current_user.role != 'Admin':
+        return redirect(url_for('dashboard_karyawan'))
     return render_template("kategori_surat.html")
 
 @app.route("/laporan_arsip")
 @login_required
 def laporan_arsip():
+    if current_user.role != 'Admin':
+        return redirect(url_for('dashboard_karyawan'))
     return render_template("laporan_arsip.html")
 
 @app.route("/manajemen_user")
 @login_required
 def manajemen_user():
+    if current_user.role != 'Admin':
+        return redirect(url_for('dashboard_karyawan'))
     return render_template("manajemen_user.html")
 
 @app.route("/pengaturan_ai")
 @login_required
 def pengaturan_ai():
+    if current_user.role != 'Admin':
+        return redirect(url_for('dashboard_karyawan'))
     return render_template("pengaturan_ai.html")
 
 @app.route("/perbandingan_algoritma")
 @login_required
 def perbandingan_algoritma():
+    if current_user.role != 'Admin':
+        return redirect(url_for('dashboard_karyawan'))
     return render_template("perbandingan_algoritma.html")
 
 @app.route("/pengaturan_akun_admin")
 @login_required
 def pengaturan_akun_admin():
+    if current_user.role != 'Admin':
+        return redirect(url_for('pengaturan_akun'))
     return render_template("pengaturan_akun_admin.html")
 
 # ======================
-# MENU KARYAWAN (Terproteksi)
+# MENU KARYAWAN (Terproteksi Ketat)
 # ======================
 @app.route("/dashboard_karyawan")
 @login_required
 def dashboard_karyawan():
+    if current_user.role != 'Karyawan':
+        return redirect(url_for('dashboard_admin'))
     return render_template("dashboard_karyawan.html")
 
 @app.route("/pengaturan_akun")
 @login_required
 def pengaturan_akun():
+    if current_user.role != 'Karyawan':
+        return redirect(url_for('pengaturan_akun_admin'))
     return render_template("pengaturan_akun.html")
-
 
 # ======================
 # API MANAJEMEN USER (CRUD KE MYSQL)
@@ -136,6 +216,7 @@ def get_users():
             "nama": u.nama,
             "email": u.email,
             "role": u.role,
+            "foto": u.foto
         })
     return jsonify(output)
 
@@ -144,14 +225,20 @@ def get_users():
 def add_user():
     data = request.json
     try:
+        role = data['role']
+        # Pastikan hanya ada 1 akun untuk setiap role
+        if User.query.filter_by(role=role).first():
+            return jsonify({"status": "error", "message": f"Sudah ada akun dengan role {role}! Hanya diizinkan 1 akun."})
+            
         new_user = User(
             nama=data['nama'],
             email=data['email'],
-            password='digisurat123', # Password default
-            role=data['role'],
+            password=generate_password_hash('digisurat123'), # Password default
+            role=role,
         )
         db.session.add(new_user)
         db.session.commit()
+        log_aktivitas(current_user.id, f"Menambahkan user baru: {data['nama']}", "Selesai")
         return jsonify({"status": "success", "message": "User berhasil ditambah"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
@@ -163,10 +250,14 @@ def edit_user_api(id):
     user = User.query.get(id)
     if user:
         try:
+            if data['role'] != user.role:
+                if User.query.filter_by(role=data['role']).first():
+                    return jsonify({"status": "error", "message": f"Sudah ada akun dengan role {data['role']}! Hanya diizinkan 1 akun."})
             user.nama = data['nama']
             user.email = data['email']
             user.role = data['role']
             db.session.commit()
+            log_aktivitas(current_user.id, f"Mengubah data user: {data['nama']}", "Selesai")
             return jsonify({"status": "success", "message": "User berhasil diperbarui"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
@@ -177,8 +268,10 @@ def edit_user_api(id):
 def delete_user_api(id):
     user = User.query.get(id)
     if user:
+        nama_user = user.nama
         db.session.delete(user)
         db.session.commit()
+        log_aktivitas(current_user.id, f"Menghapus user: {nama_user}", "Selesai")
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "User tidak ditemukan"})
 
@@ -212,6 +305,7 @@ def update_profile_api():
                 current_user.foto = f"static/uploads/{new_filename}"
 
         db.session.commit()
+        log_aktivitas(current_user.id, "Memperbarui profil", "Sukses")
         return jsonify({
             "status": "success", 
             "message": "Profil berhasil diperbarui",
@@ -226,13 +320,38 @@ def update_password_api():
     data = request.json
     old_pass = data['old_pass']
     new_pass = data['new_pass']
-    if current_user.password == old_pass:
-        current_user.password = new_pass
+    if check_password_hash(current_user.password, old_pass):
+        current_user.password = generate_password_hash(new_pass)
         db.session.commit()
+        log_aktivitas(current_user.id, "Mengganti password", "Sukses")
         return jsonify({"status": "success", "message": "Password berhasil diperbarui"})
     else:
         return jsonify({"status": "error", "message": "Password lama tidak sesuai"})
 
+@app.route("/api/profile/aktivitas", methods=["GET"])
+@login_required
+def get_aktivitas_api():
+    aktivitas = AktivitasLog.query.filter_by(user_id=current_user.id).order_by(AktivitasLog.waktu.desc()).limit(50).all()
+    output = []
+    for a in aktivitas:
+        # Konversi waktu ke format lokal atau string yg mudah dibaca
+        output.append({
+            "waktu": a.waktu.strftime("%d %b %Y, %H:%M"),
+            "kegiatan": a.kegiatan,
+            "status": a.status
+        })
+    return jsonify(output)
+
+@app.route("/api/profile/aktivitas", methods=["DELETE"])
+@login_required
+def delete_aktivitas_api():
+    try:
+        AktivitasLog.query.filter_by(user_id=current_user.id).delete()
+        db.session.commit()
+        return jsonify({"status": "success", "message": "Riwayat aktivitas berhasil dihapus"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # ======================
 # API MANAJEMEN SURAT (CRUD KE MYSQL)
@@ -327,6 +446,7 @@ def add_surat_api():
         )
         db.session.add(new_surat)
         db.session.commit()
+        log_aktivitas(current_user.id, f"Menambahkan surat: {data['nomor']}", "Selesai")
         return jsonify({"status": "success", "message": "Surat berhasil ditambah"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
@@ -358,6 +478,7 @@ def edit_surat_api(id):
                 surat.file_path = _normalize_surat_file_path(data['file'])
             
             db.session.commit()
+            log_aktivitas(current_user.id, f"Mengubah surat: {data['nomor']}", "Selesai")
             return jsonify({"status": "success", "message": "Surat berhasil diperbarui"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
@@ -368,8 +489,10 @@ def edit_surat_api(id):
 def delete_surat_api(id):
     surat = Surat.query.get(id)
     if surat:
+        nomor_surat = surat.nomor_surat
         db.session.delete(surat)
         db.session.commit()
+        log_aktivitas(current_user.id, f"Menghapus surat: {nomor_surat}", "Selesai")
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Surat tidak ditemukan"})
 
@@ -417,6 +540,7 @@ def add_kategori_api():
         )
         db.session.add(new_kategori)
         db.session.commit()
+        log_aktivitas(current_user.id, f"Menambahkan kategori: {data['nama']}", "Selesai")
         return jsonify({"status": "success", "message": "Kategori berhasil ditambah"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
@@ -431,6 +555,7 @@ def edit_kategori_api(id):
             kat.nama = data['nama']
             kat.deskripsi = data.get('deskripsi', '')
             db.session.commit()
+            log_aktivitas(current_user.id, f"Mengubah kategori: {data['nama']}", "Selesai")
             return jsonify({"status": "success", "message": "Kategori berhasil diperbarui"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
@@ -446,8 +571,10 @@ def delete_kategori_api(id):
             if surat_count > 0:
                 return jsonify({"status": "error", "message": "Gagal: Kategori masih digunakan oleh arsip surat."})
             
+            nama_kat = kat.nama
             db.session.delete(kat)
             db.session.commit()
+            log_aktivitas(current_user.id, f"Menghapus kategori: {nama_kat}", "Selesai")
             return jsonify({"status": "success"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
@@ -614,6 +741,7 @@ def profile_stats():
     """Stat card di halaman profil: total surat, algoritma aktif, akurasi."""
     try:
         total_surat = Surat.query.count()
+        jumlah_kategori = Kategori.query.count()
         ai_status   = ai_engine.get_ai_status()
         nb  = (ai_status.get('metrics') or {}).get('naive_bayes', {})
         knn = (ai_status.get('metrics') or {}).get('knn', {})
@@ -626,11 +754,12 @@ def profile_stats():
 
         return jsonify({
             "total_surat": total_surat,
+            "jumlah_kategori": jumlah_kategori,
             "algoritma":   algo_name if ai_status.get('trained') else '-',
             "akurasi":     f"{best_acc*100:.0f}%" if ai_status.get('trained') else '-',
         })
     except Exception as e:
-        return jsonify({"total_surat": 0, "algoritma": "-", "akurasi": "-"})
+        return jsonify({"total_surat": 0, "jumlah_kategori": 0, "algoritma": "-", "akurasi": "-"})
 
 
 
@@ -680,10 +809,12 @@ def upload_pdf_api():
 def create_initial_data():
     with app.app_context():
         db.create_all() 
-        if not User.query.filter_by(email='admin@polibatam.ac.id').first():
-            admin = User(nama="Administrator", email="admin@polibatam.ac.id", password="admin123", role="Admin")
-            karyawan = User(nama="Karyawan Biasa", email="karyawan@polibatam.ac.id", password="karyawan123", role="Karyawan")
-            db.session.add_all([admin, karyawan])
+        if not User.query.filter_by(role='Admin').first():
+            admin = User(nama="Administrator", email="admin@polibatam.ac.id", password=generate_password_hash("admin123"), role="Admin")
+            db.session.add(admin)
+        if not User.query.filter_by(role='Karyawan').first():
+            karyawan = User(nama="Karyawan Biasa", email="karyawan@polibatam.ac.id", password=generate_password_hash("karyawan123"), role="Karyawan")
+            db.session.add(karyawan)
         
         if not Kategori.query.first():
             k1 = Kategori(nama="Undangan", deskripsi="Surat Undangan")

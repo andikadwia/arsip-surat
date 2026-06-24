@@ -144,7 +144,7 @@
           <i class="fa-solid fa-chevron-down chevron"></i>
         </button>
         <div class="dropdown-menu" id="dropdownMenu">
-          <a href="/pengaturan_akun"><i class="fa-regular fa-user"></i> Profil Saya</a>
+          <a href="{{ url_for('pengaturan_akun') }}"><i class="fa-regular fa-user"></i> Profil Saya</a>
           <div class="dropdown-divider"></div>
           <button class="logout-btn" onclick="handleLogout()">
             <i class="fa-solid fa-right-from-bracket"></i> Logout
@@ -210,7 +210,7 @@
           <tbody id="karyawanTableBody"></tbody>
         </table>
       </div>
-      <a href="#" class="see-all-link" id="lihatSemuaBtn" onclick="showAllKaryawan(event)">Lihat Semua</a>
+      <a href="#" class="see-all-link" id="lihatSemuaBtn" onclick="showAllKaryawan(event)" style="display:none;">Lihat Semua Surat</a>
     </div>
 
   </main>
@@ -320,6 +320,9 @@
   function downloadSuratPdfById(suratId) {
     const surat = allSurat.find(s => s.id === suratId);
     downloadSuratPdf(suratId, surat ? (surat.file || surat.file_path) : '');
+    // Catat unduhan ke localStorage untuk stat card profil
+    const prev = parseInt(localStorage.getItem('kary_download_count') || '0');
+    localStorage.setItem('kary_download_count', prev + 1);
   }
 
   function renderTableKaryawan(limit) {
@@ -328,6 +331,7 @@
     
     if (items.length === 0) {
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">Belum ada arsip surat.</td></tr>`;
+      document.getElementById('lihatSemuaBtn').style.display = 'none';
       return;
     }
     
@@ -355,6 +359,14 @@
       </tr>
     `;
     }).join('');
+
+    // Tampilkan tombol "Lihat Semua" hanya jika ada lebih dari 5 surat dan sedang tidak menampilkan semua
+    const lihatBtn = document.getElementById('lihatSemuaBtn');
+    if (!showingAll && allSurat.length > 5) {
+      lihatBtn.style.display = '';
+    } else {
+      lihatBtn.style.display = 'none';
+    }
   }
 
   loadDashboardKaryawanData();
@@ -378,7 +390,34 @@
   }
 
   function downloadAllSurat() {
-    showToast('Mengunduh semua surat...', 'success');
+    if (allSurat.length === 0) {
+      // Tidak ada surat
+      showToast('Belum ada surat yang dapat diunduh', 'error');
+      return;
+    }
+    // Konfirmasi sebelum unduh semua
+    if (!confirm('Apakah Anda yakin mengunduh semua surat?')) return;
+
+    let count = 0;
+    allSurat.forEach((surat, idx) => {
+      const filePath = surat.file || surat.file_path;
+      if (filePath) {
+        // Beri jeda sedikit agar browser tidak memblokir banyak download sekaligus
+        setTimeout(() => {
+          downloadSuratPdf(surat.id, filePath);
+        }, idx * 600);
+        count++;
+      }
+    });
+
+    if (count > 0) {
+      // Tambah hitungan unduhan ke localStorage untuk ditampilkan di profil
+      const prev = parseInt(localStorage.getItem('kary_download_count') || '0');
+      localStorage.setItem('kary_download_count', prev + count);
+      showToast(`Mengunduh ${count} surat...`, 'success');
+    } else {
+      showToast('Tidak ada file yang tersedia untuk diunduh', 'error');
+    }
   }
 </script>
 </body>

@@ -199,9 +199,8 @@
       <div class="topbar-right">
         <div style="position:relative;">
           <button class="user-menu-btn" id="userMenuBtn" onclick="toggleDropdown()">
-            <img src="https://ui-avatars.com/api/?name=Admin&background=3b82f6&color=fff&size=72" alt="Avatar Admin"
-              class="user-avatar">
-            Admin
+            <img src="{{ '/' + current_user.foto if current_user.foto else 'https://ui-avatars.com/api/?name=' + current_user.nama + '&background=3b82f6&color=fff&size=72' }}" alt="Avatar" class="user-avatar">
+            {{ current_user.nama }}
             <i class="fa-solid fa-chevron-down chevron"></i>
           </button>
           <div class="dropdown-menu" id="dropdownMenu">
@@ -300,13 +299,9 @@
 
       <!-- TAB SELECTOR -->
       <div style="display:flex;border-bottom:1px solid var(--border);background:#f8fafc;">
-        <button id="tabAiBtn" onclick="switchUploadTab('ai')"
-          style="flex:1;padding:12px;border:none;background:transparent;font-weight:700;font-size:0.9rem;color:#2563eb;border-bottom:2px solid #2563eb;cursor:pointer;">
+        <button id="tabAiBtn"
+          style="flex:1;padding:12px;border:none;background:transparent;font-weight:700;font-size:0.9rem;color:#2563eb;border-bottom:2px solid #2563eb;cursor:default;">
           <i class="fa-solid fa-robot"></i> Upload PDF Otomatis (AI)
-        </button>
-        <button id="tabManualBtn" onclick="switchUploadTab('manual')"
-          style="flex:1;padding:12px;border:none;background:transparent;font-weight:600;font-size:0.9rem;color:var(--text-secondary);cursor:pointer;">
-          <i class="fa-solid fa-pen-to-square"></i> Isi Manual
         </button>
       </div>
 
@@ -317,8 +312,7 @@
         </p>
         <label class="file-upload-area" for="pdfAutoFile" id="pdfDropArea"
           style="border:2px dashed #2563eb;background:#eff6ff;border-radius:10px;padding:32px;text-align:center;cursor:pointer;display:block;">
-          <i class="fa-solid fa-file-pdf" style="font-size:2.5rem;color:#2563eb;display:block;margin-bottom:10px;"></i>
-          <div id="pdfAutoFileName" style="font-weight:600;color:#1e40af;">Klik atau drag-drop file PDF di sini</div>
+          <div id="pdfAutoFileName" style="font-weight:600;color:#1e40af;">Klik file PDF di sini</div>
           <div style="font-size:0.78rem;color:#64748b;margin-top:4px;">Hanya file PDF (maks 10MB)</div>
           <input type="file" id="pdfAutoFile" accept=".pdf" style="display:none;" onchange="onPdfAutoSelect(this)">
         </label>
@@ -366,58 +360,11 @@
         <div id="pdfFallback" style="display:none;text-align:center;padding:16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;margin-top:16px;">
           <i class="fa-solid fa-triangle-exclamation" style="color:#ea580c;font-size:1.2rem;"></i>
           <p style="font-weight:600;color:#c2410c;margin:8px 0 4px;">PDF tidak bisa dibaca otomatis</p>
-          <p style="font-size:0.82rem;color:#9a3412;">Kemungkinan PDF hasil scan. Gunakan tab Isi Manual.</p>
-          <button class="btn btn-outline" style="margin-top:10px;" onclick="switchUploadTab('manual')">
-            Isi Manual <i class="fa-solid fa-arrow-right"></i>
-          </button>
+          <p style="font-size:0.82rem;color:#9a3412;">Pastikan PDF yang diupload bukan hasil scan dan memiliki teks yang bisa dibaca.</p>
         </div>
       </div>
 
-      <!-- TAB MANUAL: Form biasa -->
-      <div id="tabManual" style="display:none;padding:4px 20px 20px;">
-      <div class="form-row" style="margin-top:16px;">
-        <div class="form-group">
-          <label class="form-label">Nomor Surat *</label>
-          <input type="text" class="form-control" id="uploadNomor" placeholder="Contoh: 420/123/DIS/IV/2026">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Tanggal Surat *</label>
-          <input type="date" class="form-control" id="uploadTanggal">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Pengirim *</label>
-        <input type="text" class="form-control" id="uploadPengirim" placeholder="Nama instansi / pengirim"
-          oninput="scheduleAiClassify()">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Perihal *</label>
-        <input type="text" class="form-control" id="uploadPerihal" placeholder="Perihal / isi singkat surat"
-          oninput="scheduleAiClassify()">
-        <div class="ai-suggest-box" id="aiSuggestBox">
-          <span class="ai-label" id="aiSuggestText"><i class="fa-solid fa-robot"></i> Saran AI: -</span>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Kategori * <span
-            style="font-weight:400;color:var(--text-secondary);font-size:0.8rem;">(otomatis diisi oleh AI)</span></label>
-        <select class="form-control" id="uploadKategori">
-          <option value="">-- Mendeteksi kategori... --</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">File Surat (PDF) *</label>
-        <label class="file-upload-area" for="uploadFile">
-          <div class="upload-icon"><i class="fa-solid fa-file-pdf"></i></div>
-          <div class="upload-text" id="uploadFileName">Klik untuk pilih file atau drag & drop disini</div>
-          <input type="file" id="uploadFile" accept=".pdf,.doc,.docx" onchange="onFileSelect(this)">
-        </label>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-outline" onclick="closeModal('uploadSuratModal')">Batal</button>
-        <button class="btn btn-primary" onclick="submitUploadSurat()"><i class="fa-solid fa-save"></i> Simpan</button>
-      </div>
-      </div>
+
     </div>
   </div>
 
@@ -597,21 +544,7 @@
       }
     }
 
-    // ── Tab Switch ──
-    function switchUploadTab(tab) {
-      const isAi = tab === 'ai';
-      document.getElementById('tabAi').style.display = isAi ? 'block' : 'none';
-      document.getElementById('tabManual').style.display = isAi ? 'none' : 'block';
-      const aiBtn = document.getElementById('tabAiBtn');
-      const manBtn = document.getElementById('tabManualBtn');
-      aiBtn.style.color = isAi ? '#2563eb' : 'var(--text-secondary)';
-      aiBtn.style.borderBottom = isAi ? '2px solid #2563eb' : 'none';
-      aiBtn.style.fontWeight = isAi ? '700' : '600';
-      manBtn.style.color = isAi ? 'var(--text-secondary)' : '#2563eb';
-      manBtn.style.borderBottom = isAi ? 'none' : '2px solid #2563eb';
-      manBtn.style.fontWeight = isAi ? '600' : '700';
-      if (!isAi) loadKategoriOptions();
-    }
+    // ── Tab Switch dihapus, hanya mode AI ──
 
     // ── Tab AI: Pilih PDF → kirim ke backend → tampilkan preview ──
     let pdfExtracted = null;

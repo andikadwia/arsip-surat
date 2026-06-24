@@ -20,6 +20,27 @@
     .btn-export { height: 34px; border: none; border-radius: 8px; color: #fff; padding: 0 18px; font-size: 0.84rem; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; transition: 0.2s; }
     .btn-export.excel { background: #22c55e; } .btn-export.excel:hover { background: #16a34a; }
     .btn-export.pdf { background: #ef4444; } .btn-export.pdf:hover { background: #dc2626; }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      .panel, .panel * {
+        visibility: visible;
+      }
+      .panel {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+      }
+      .btn-show, .export-actions {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -46,7 +67,9 @@
     <h1 class="topbar-title">Cetak dan Unduh Laporan</h1>
     <div class="topbar-right">
       <button class="user-menu-btn" onclick="toggleDropdown()">
-        <img src="https://ui-avatars.com/api/?name=Admin&background=3b82f6&color=fff&size=72" alt="Avatar Admin" class="user-avatar"> Admin <i class="fa-solid fa-chevron-down chevron"></i>
+        <img src="{{ '/' + current_user.foto if current_user.foto else 'https://ui-avatars.com/api/?name=' + current_user.nama + '&background=3b82f6&color=fff&size=72' }}" alt="Avatar" class="user-avatar">
+            {{ current_user.nama }}
+            <i class="fa-solid fa-chevron-down chevron"></i>
       </button>
       <div class="dropdown-menu" id="dropdownMenu">
         <a href="/pengaturan_akun_admin"><i class="fa-regular fa-user"></i> Profil Saya</a>
@@ -69,7 +92,7 @@
       <div class="filter-group">
         <label for="kategoriLaporan">Kategori Surat</label>
         <select id="kategoriLaporan">
-          <option value="">Semua Kategori</option>
+          <option value="">-- Pilih Kategori --</option>
         </select>
       </div>
       <button class="btn-show" onclick="triggerFilter()"><i class="fa-solid fa-magnifying-glass"></i> Tampilkan Data</button>
@@ -92,8 +115,7 @@
               <tr><th>No</th><th>Nomor Surat</th><th>Tanggal Surat</th><th>Pengirim</th><th>Perihal</th><th>Kategori</th></tr>
             </thead>
             <tbody>
-              <!-- Akan diisi oleh JS -->
-            </tbody>
+              </tbody>
           </table>
         </div>
         
@@ -136,38 +158,47 @@
     try {
       const response = await fetch('/api/surat');
       allSurat = await response.json();
-      filterDanTampilkanData(5);
-      
+
       const resKategori = await fetch('/api/kategori');
       const dataKategori = await resKategori.json();
       const selectKat = document.getElementById('kategoriLaporan');
-      selectKat.innerHTML = '<option value="">Semua Kategori</option>';
+      selectKat.innerHTML = '<option value="">-- Pilih Kategori --</option>';
       dataKategori.forEach(k => {
         selectKat.innerHTML += `<option value="${k.nama}">${k.nama}</option>`;
       });
+
+      renderEmptyPrompt();
+      document.getElementById('btnLihatSemua').style.display = 'none';
     } catch (e) {
       console.error(e);
       showToast('Gagal memuat data', 'error');
     }
   }
 
+  function renderEmptyPrompt() {
+    const tbody = document.querySelector('.data-table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted);">Pilih rentang tanggal dan kategori surat, lalu klik Tampilkan Data</td></tr>`;
+  }
+
   function filterDanTampilkanData(limit) {
     const tglMulai = document.getElementById('tanggalMulai').value;
     const tglSampai = document.getElementById('tanggalSampai').value;
     const kategori = document.getElementById('kategoriLaporan').value;
-    
+
     let filtered = allSurat.filter(s => {
       let matchTgl = true;
       if (tglMulai && s.tanggal < tglMulai) matchTgl = false;
       if (tglSampai && s.tanggal > tglSampai) matchTgl = false;
-      
+
       let matchKat = true;
       if (kategori && s.kategori !== kategori) matchKat = false;
-      
+
       return matchTgl && matchKat;
     });
 
     renderTable(filtered, limit);
+    return filtered;
   }
 
   function renderTable(data, limit) {
@@ -208,41 +239,60 @@
   fetchSurat();
 
   function triggerFilter() {
-    showToast('Menampilkan data...', 'info');
-    filterDanTampilkanData();
+    const tglMulai = document.getElementById('tanggalMulai').value;
+    const tglSampai = document.getElementById('tanggalSampai').value;
+    const kategori = document.getElementById('kategoriLaporan').value;
+
+    if (!tglMulai || !tglSampai || !kategori) {
+      showToast('Harap isi dari tanggal, sampai tanggal, dan kategori surat', 'warning');
+      return;
+    }
+
+    if (tglMulai > tglSampai) {
+      showToast('Tanggal mulai tidak boleh melebihi tanggal akhir', 'warning');
+      return;
+    }
+
+    const filtered = filterDanTampilkanData(5);
     document.getElementById('btnLihatSemua').style.display = 'none';
+
+    if (filtered.length === 0) {
+      showToast('data laporan arsip tidak ada', 'warning');
+    }
   }
   
   function triggerLihatSemua() {
-    showToast('Menampilkan semua arsip surat...', 'info');
     document.getElementById('tanggalMulai').value = '';
     document.getElementById('tanggalSampai').value = '';
     document.getElementById('kategoriLaporan').value = '';
-    filterDanTampilkanData();
+    const filtered = filterDanTampilkanData(Infinity);
     document.getElementById('btnLihatSemua').style.display = 'none';
+    if (filtered.length === 0) {
+      showToast('data laporan arsip tidak ada', 'warning');
+    }
   }
 
   function exportExcel() {
-    showToast('Mengekspor ke Excel (CSV)...', 'info');
-    const tbody = document.querySelector('.data-table tbody');
-    const rows = tbody.querySelectorAll('tr');
-    let csvContent = "data:text/csv;charset=utf-8,No,Nomor Surat,Tanggal Surat,Pengirim,Perihal,Kategori\n";
+    showToast('Mengekspor ke Excel...', 'info');
+    const table = document.querySelector('.data-table');
+    const html = table.outerHTML;
     
-    rows.forEach(r => {
-        const cols = r.querySelectorAll('td');
-        if(cols.length > 1) {
-            const rowData = Array.from(cols).map(c => `"${c.innerText}"`).join(",");
-            csvContent += rowData + "\n";
-        }
-    });
+    // Create a complete HTML document for Excel
+    const template = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="UTF-8"></head>
+    <body>${html}</body>
+    </html>`;
 
-    const encodedUri = encodeURI(csvContent);
+    const blob = new Blob([template], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "laporan_arsip.csv");
+    link.href = url;
+    link.download = "laporan_arsip.xls";
     document.body.appendChild(link);
     link.click();
-    link.remove();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   function exportPDF() {

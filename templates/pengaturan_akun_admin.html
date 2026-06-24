@@ -150,7 +150,7 @@
           <i class="fa-solid fa-chevron-down chevron"></i>
         </button>
         <div class="dropdown-menu" id="dropdownMenu">
-          <a href="/pengaturan_akun_admin"><i class="fa-regular fa-user"></i> Profil Saya</a>
+          <a href="{{ url_for('pengaturan_akun_admin') }}"><i class="fa-regular fa-user"></i> Profil Saya</a>
           <a href="#" onclick="openModal('gantiSandiModal')"><i class="fa-solid fa-key"></i> Ganti Sandi</a>
           <div class="dropdown-divider"></div>
           <button class="logout-btn" onclick="openModal('logoutModal')">
@@ -214,7 +214,7 @@
             <div class="ms-val" id="adminStatSurat">...</div>
           </div>
           <div class="mini-stat-box">
-            <div class="ms-lbl">Algoritma Aktif</div>
+            <div class="ms-lbl">Jumlah Kategori</div>
             <div class="ms-val" id="adminStatAlgo">...</div>
           </div>
           <div class="mini-stat-box">
@@ -225,6 +225,9 @@
       </div>
 
       <div class="tab-pane" id="tabAktivitas">
+        <div style="text-align: right; margin-bottom: 10px;">
+          <button class="btn btn-danger" onclick="openModal('hapusAktivitasModal')" style="padding: 6px 12px; border: none; border-radius: 6px; background: var(--danger-color, #ef4444); color: white; cursor: pointer; font-size: 0.85rem;"><i class="fa-solid fa-trash"></i> Hapus Semua Riwayat Aktivitas</button>
+        </div>
         <table class="act-tbl">
           <thead>
             <tr>
@@ -233,22 +236,8 @@
               <th>Status</th>
             </tr>
           </thead>
-          <tbody>
-            <tr>
-              <td>15 Apr 2026, 07:00</td>
-              <td>Login ke Sistem</td>
-              <td><span class="status-badge sb-sukses">Sukses</span></td>
-            </tr>
-            <tr>
-              <td>14 Apr 2026, 16:30</td>
-              <td>Mengunggah Surat Baru</td>
-              <td><span class="status-badge sb-selesai">Selesai</span></td>
-            </tr>
-            <tr>
-              <td>14 Apr 2026, 15:00</td>
-              <td>Mengelola Manajemen User</td>
-              <td><span class="status-badge sb-selesai">Selesai</span></td>
-            </tr>
+          <tbody id="aktivitasTableBody">
+            <tr><td colspan="3" style="text-align:center;">Memuat data...</td></tr>
           </tbody>
         </table>
       </div>
@@ -337,8 +326,24 @@
     </div>
     <div class="form-actions" style="justify-content:center;">
       <button class="btn btn-outline" onclick="closeModal('logoutModal')">Batal</button>
-      <button class="btn btn-danger" onclick="window.location.href='/'">
+      <button class="btn btn-danger" onclick="window.location.href='/logout'">
         <i class="fa-solid fa-right-from-bracket"></i> Keluar
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="hapusAktivitasModal">
+  <div class="modal" style="max-width:380px;">
+    <div class="confirm-icon"><i class="fa-solid fa-trash"></i></div>
+    <div class="confirm-text">
+      <h3>Hapus Riwayat Aktivitas</h3>
+      <p>Apakah Anda yakin ingin menghapus semua riwayat aktivitas? Tindakan ini tidak dapat dibatalkan.</p>
+    </div>
+    <div class="form-actions" style="justify-content:center;">
+      <button class="btn btn-outline" onclick="closeModal('hapusAktivitasModal')">Batal</button>
+      <button class="btn btn-danger" onclick="confirmHapusRiwayatAktivitas()">
+        <i class="fa-solid fa-trash"></i> Hapus
       </button>
     </div>
   </div>
@@ -349,15 +354,22 @@
 <script src="../static/app.js"></script>
 <script>
   initPage('pengaturan-akun-admin');
+  let tempFoto = null;
 
   // ── Load stat card dari API ──
   async function loadProfileStats() {
     try {
-      const res  = await fetch('/api/profile/stats');
-      const data = await res.json();
-      document.getElementById('adminStatSurat').textContent   = data.total_surat ?? '-';
-      document.getElementById('adminStatAlgo').textContent    = data.algoritma   ?? '-';
-      document.getElementById('adminStatAkurasi').textContent = data.akurasi     ?? '-';
+      const [resSurat, resKategori, resAi] = await Promise.all([
+        fetch('/api/surat'),
+        fetch('/api/kategori'),
+        fetch('/api/profile/stats'),
+      ]);
+      const dataSurat    = await resSurat.json();
+      const dataKategori = await resKategori.json();
+      const dataAi       = await resAi.json();
+      document.getElementById('adminStatSurat').textContent   = dataSurat.length ?? '-';
+      document.getElementById('adminStatAlgo').textContent    = dataKategori.length ?? '-';
+      document.getElementById('adminStatAkurasi').textContent = dataAi.akurasi     ?? '-';
     } catch (e) {
       document.getElementById('adminStatSurat').textContent   = '-';
       document.getElementById('adminStatAlgo').textContent    = '-';
@@ -366,6 +378,38 @@
   }
   loadProfileStats();
 
+  // ── Riwayat Aktivitas (real-time polling) ──
+  async function loadAktivitas() {
+    const tbody = document.getElementById('aktivitasTableBody');
+    if (!tbody) return;
+    try {
+      const response = await fetch('/api/profile/aktivitas');
+      const data = await response.json();
+      
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Belum ada aktivitas tercatat</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map(a => {
+        let badgeClass = 'sb-info';
+        if (a.status === 'Sukses') badgeClass = 'sb-sukses';
+        else if (a.status === 'Selesai') badgeClass = 'sb-selesai';
+        return `
+          <tr>
+            <td>${a.waktu}</td>
+            <td>${a.kegiatan}</td>
+            <td><span class="status-badge ${badgeClass}">${a.status}</span></td>
+          </tr>
+        `;
+      }).join('');
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Gagal memuat aktivitas</td></tr>';
+    }
+  }
+  loadAktivitas();
+  // Auto-refresh aktivitas setiap 10 detik
+  setInterval(loadAktivitas, 10000);
 
   document.getElementById('editProfilNama').value  = '{{ current_user.nama }}';
   document.getElementById('editProfilEmail').value = '{{ current_user.email }}';
@@ -375,6 +419,8 @@
     document.getElementById('tabAktivitas').classList.toggle('active', tab === 'aktivitas');
     document.getElementById('tabInfoBtn').classList.toggle('active', tab === 'info');
     document.getElementById('tabAktivitasBtn').classList.toggle('active', tab === 'aktivitas');
+    // Refresh aktivitas setiap kali tab aktivitas dibuka
+    if (tab === 'aktivitas') loadAktivitas();
   }
 
   function bukaModalEditProfil() {
@@ -420,8 +466,9 @@
         document.getElementById('topbarName').textContent  = nama;
         
         if (res.foto_url) {
-          document.getElementById('profileAvatar').src = '/' + res.foto_url;
-          document.getElementById('topbarAvatar').src  = '/' + res.foto_url;
+          const cacheBust = '?t=' + Date.now();
+          document.getElementById('profileAvatar').src = '/' + res.foto_url + cacheBust;
+          document.getElementById('topbarAvatar').src  = '/' + res.foto_url + cacheBust;
         } else if (tempFoto) {
           document.getElementById('profileAvatar').src = tempFoto;
           document.getElementById('topbarAvatar').src  = tempFoto;
@@ -465,6 +512,24 @@
         document.getElementById('oldPass').value = '';
         document.getElementById('newPass').value = '';
         document.getElementById('confirmPass').value = '';
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch(e) {
+      showToast('Terjadi kesalahan', 'error');
+    }
+  }
+
+  async function confirmHapusRiwayatAktivitas() {
+    closeModal('hapusAktivitasModal');
+    try {
+      const response = await fetch('/api/profile/aktivitas', {
+        method: 'DELETE'
+      });
+      const res = await response.json();
+      if (res.status === 'success') {
+        showToast(res.message, 'success');
+        loadAktivitas();
       } else {
         showToast(res.message, 'error');
       }

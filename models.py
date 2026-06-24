@@ -1,6 +1,10 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin  # <-- INI YANG PALING PENTING
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# Helper: waktu lokal WIB (UTC+7)
+def now_wib():
+    return datetime.now(timezone(timedelta(hours=7))).replace(tzinfo=None)
 
 db = SQLAlchemy()
 
@@ -34,7 +38,7 @@ class Surat(db.Model):
     perihal = db.Column(db.String(255), nullable=False)
     file_path = db.Column(db.String(255), nullable=False)
     kategori_id = db.Column(db.Integer, db.ForeignKey('kategori.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=now_wib)
 
 class AktivitasLog(db.Model):
     __tablename__ = 'aktivitas_log'
@@ -43,4 +47,4 @@ class AktivitasLog(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     kegiatan = db.Column(db.String(255), nullable=False)
     status = db.Column(db.String(50), nullable=False, default='Sukses')  # Sukses, Selesai, Info
-    waktu = db.Column(db.DateTime, default=datetime.utcnow)
+    waktu = db.Column(db.DateTime, default=now_wib)

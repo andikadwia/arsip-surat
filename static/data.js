@@ -2,10 +2,12 @@
    DigiSurat - Shared Data Store (localStorage)
    ============================================================ */
 
-// --- Letters (Surat) ---
+// --- Letters (Surat) & Kategori ---
 const LETTERS_KEY = 'digisurat_letters';
 const KATEGORI_KEY = 'digisurat_kategori';
-const USERS_KEY = 'digisurat_users';
+
+// CATATAN: USERS_KEY dan defaultUsers telah dihapus sepenuhnya. 
+// Autentikasi dan data user 100% ditangani oleh Flask Backend.
 
 const defaultLetters = [
   {
@@ -62,11 +64,6 @@ const defaultKategori = [
   { id: 4, nama: 'Edaran', deskripsi: 'Surat edaran yang ditujukan kepada seluruh civitas.' }
 ];
 
-const defaultUsers = [
-  { id: 1, nama: 'Admin', email: 'admin@polibatam.ac.id', role: 'Admin', status: 'Aktif', lastLogin: '15 Apr 2026, 07:00' },
-  { id: 2, nama: 'Karyawan', email: 'karyawan@polibatam.ac.id', role: 'Karyawan', status: 'Aktif', lastLogin: '09 Apr 2026, 10:30' }
-];
-
 // Init defaults if not exist
 function initStorage() {
   if (!localStorage.getItem(LETTERS_KEY)) {
@@ -75,9 +72,7 @@ function initStorage() {
   if (!localStorage.getItem(KATEGORI_KEY)) {
     localStorage.setItem(KATEGORI_KEY, JSON.stringify(defaultKategori));
   }
-  if (!localStorage.getItem(USERS_KEY)) {
-    localStorage.setItem(USERS_KEY, JSON.stringify(defaultUsers));
-  }
+  // Init storage untuk USERS_KEY dihapus agar tidak menimpa session Flask
 }
 initStorage();
 
@@ -123,23 +118,19 @@ function deleteKategori(id) {
   localStorage.setItem(KATEGORI_KEY, JSON.stringify(list));
 }
 
-// --- User CRUD ---
-function getUsers() {
-  return JSON.parse(localStorage.getItem(USERS_KEY)) || [];
-}
-function getUserById(id) {
-  return getUsers().find(u => u.id === id || u.id === parseInt(id));
-}
-function addUser(user) {
-  const list = getUsers();
-  list.push(user);
-  localStorage.setItem(USERS_KEY, JSON.stringify(list));
-}
-function updateUser(id, data) {
-  const list = getUsers().map(u => (u.id === id || u.id === parseInt(id)) ? { ...u, ...data } : u);
-  localStorage.setItem(USERS_KEY, JSON.stringify(list));
-}
-function deleteUser(id) {
-  const list = getUsers().filter(u => u.id !== id && u.id !== parseInt(id));
-  localStorage.setItem(USERS_KEY, JSON.stringify(list));
-}
+// --- User CRUD DIHAPUS ---
+// Fungsi getUsers(), getUserById(), addUser(), updateUser(), dan deleteUser() 
+// telah dihapus karena manajemen user sekarang berada di Flask Backend.
+
+
+/* ============================================================
+   PEMBERSIH CACHE ROLE (FIX BUG SPLIT-BRAIN)
+   ============================================================ */
+(function clearObsoleteMockData() {
+  // Mengeksekusi pembersihan otomatis saat script dimuat.
+  // Ini memastikan bahwa localStorage browser user bersih dari data otentikasi lama
+  // yang bisa bentrok dengan session dari Flask.
+  localStorage.removeItem('digisurat_users');
+  localStorage.removeItem('currentUser');
+  localStorage.removeItem('role');
+})();

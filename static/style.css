@@ -127,6 +127,8 @@ img { max-width: 100%; display: block; }
   transition: background var(--transition), color var(--transition);
   cursor: pointer;
   white-space: nowrap;
+  /* Vendor prefix ditambahkan di sini */
+  -webkit-user-select: none;
   user-select: none;
 }
 

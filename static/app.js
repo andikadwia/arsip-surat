@@ -1,4 +1,14 @@
 /* ============================================================
+   PEMBERSIH CACHE ROLE (FIX BUG SPLIT-BRAIN)
+   ============================================================ */
+(function clearObsoleteMockData() {
+  // Eksekusi otomatis saat app.js di-load supaya data Admin/Karyawan lama di browser 
+  // langsung terhapus. Aplikasi sekarang murni mengandalkan session Flask backend.
+  localStorage.removeItem('currentUser');
+  localStorage.removeItem('role');
+})();
+
+/* ============================================================
   DigiSurat - App Logic (shared across all pages)
    ============================================================ */
 
@@ -125,9 +135,15 @@ function handleLogout() {
 
 function confirmLogout() {
   closeModal('logoutModal');
+  
+  // PERBAIKAN: Hapus semua jejak user dan role di browser saat logout
+  localStorage.removeItem('currentUser');
+  localStorage.removeItem('role');
+  localStorage.removeItem('digisurat_users'); // Opsional: bersihkan mock data user juga
+
   showToast('Berhasil logout. Mengarahkan ke halaman login...', 'info');
   
-  // UBAH BARIS INI: Arahkan ke route Flask '/logout', bukan 'login.html'
+  // Arahkan ke route Flask '/logout', bukan 'login.html'
   setTimeout(() => { window.location.href = '/logout'; }, 1200); 
 }
 

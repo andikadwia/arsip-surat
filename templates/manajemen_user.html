@@ -8,6 +8,26 @@
   <link rel="stylesheet" href="../static/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
+    #userTable th,
+    #userTable td {
+      vertical-align: middle;
+    }
+    #userTable td:first-child {
+      text-align: center;
+      width: 56px;
+    }
+    #userTable .avatar-cell {
+      text-align: center;
+      width: 72px;
+    }
+    #userTable .action-cell {
+      white-space: nowrap;
+    }
+    #userTable .action-cell-inner {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
     .avatar-circle {
       width: 42px;
       height: 42px;
@@ -45,7 +65,9 @@
     <h1 class="topbar-title">Manajemen Pengguna Sistem</h1>
     <div class="topbar-right">
       <button class="user-menu-btn" onclick="toggleDropdown()">
-        <img src="https://ui-avatars.com/api/?name=Admin&background=3b82f6&color=fff&size=72" alt="Avatar Admin" class="user-avatar"> Admin <i class="fa-solid fa-chevron-down chevron"></i>
+        <img src="{{ '/' + current_user.foto if current_user.foto else 'https://ui-avatars.com/api/?name=' + current_user.nama + '&background=3b82f6&color=fff&size=72' }}" alt="Avatar" class="user-avatar">
+            {{ current_user.nama }}
+            <i class="fa-solid fa-chevron-down chevron"></i>
       </button>
       <div class="dropdown-menu" id="dropdownMenu">
         <a href="/pengaturan_akun_admin"><i class="fa-regular fa-user"></i> Profil Saya</a>
@@ -71,8 +93,8 @@
         <table class="data-table" id="userTable">
           <thead>
             <tr>
-              <th>No</th>
-              <th style="text-align: center;">Profil</th>
+              <th style="text-align: center; width: 56px;">No</th>
+              <th class="avatar-cell">Profil</th>
               <th>Nama Pengguna</th>
               <th>Email</th>
               <th>Role</th>
@@ -244,14 +266,16 @@
       tbody.innerHTML = globalUsers.map((u, i) => `
         <tr>
           <td>${i + 1}</td>
-          <td style="text-align: center;"><img class="avatar-circle" src="https://ui-avatars.com/api/?name=${encodeURIComponent(u.nama)}&background=334155&color=fff" alt="${u.nama}"></td>
+          <td class="avatar-cell"><img class="avatar-circle" src="${u.foto ? '/' + u.foto : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.nama) + '&background=334155&color=fff'}" alt="${u.nama}"></td>
           <td style="font-weight:600;">${u.nama}</td>
           <td style="font-size:0.84rem;">${u.email}</td>
           <td><span class="user-role-badge role-${(u.role || 'karyawan').toLowerCase()}">${u.role || 'Karyawan'}</span></td>
-          <td style="white-space:nowrap;">
-            <button class="action-btn btn-reset" title="Reset Sandi" onclick="openResetSandi(${u.id})"><i class="fa-solid fa-key"></i></button>
-            <button class="action-btn btn-edit" title="Edit" onclick="openEditUser(${u.id})" style="margin-left:4px;"><i class="fa-solid fa-pen-to-square"></i></button>
-            <button class="action-btn btn-delete" title="Hapus" style="margin-left:4px;" onclick="openDeleteUser(${u.id})"><i class="fa-solid fa-trash"></i></button>
+          <td class="action-cell">
+            <div class="action-cell-inner">
+              <button class="action-btn btn-reset" title="Reset Sandi" onclick="openResetSandi(${u.id})"><i class="fa-solid fa-key"></i></button>
+              <button class="action-btn btn-edit" title="Edit" onclick="openEditUser(${u.id})"><i class="fa-solid fa-pen-to-square"></i></button>
+              <button class="action-btn btn-delete" title="Hapus" onclick="openDeleteUser(${u.id})"><i class="fa-solid fa-trash"></i></button>
+            </div>
           </td>
         </tr>
       `).join('');
