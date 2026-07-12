@@ -2,9 +2,14 @@ flask
 flask-login
 flask-sqlalchemy
 pymysql
+cryptography
+python-dotenv
 pandas
 scikit-learn
 Sastrawi
 joblib
 openpyxl
 pdfplumber
+pytesseract
+pdf2image
+reportlab

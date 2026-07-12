@@ -151,21 +151,26 @@
 <script src="../static/app.js"></script>
 <script>
   initPage('laporan-arsip');
-  
+
   let allSurat = [];
-  
+  let allKategori = [];
+
   async function fetchSurat() {
     try {
-      const response = await fetch('/api/surat');
-      allSurat = await response.json();
+      const [suratResponse, kategoriResponse] = await Promise.all([fetch('/api/surat'), fetch('/api/kategori')]);
+      allSurat = await suratResponse.json();
+      allKategori = await kategoriResponse.json();
 
-      const resKategori = await fetch('/api/kategori');
-      const dataKategori = await resKategori.json();
       const selectKat = document.getElementById('kategoriLaporan');
-      selectKat.innerHTML = '<option value="">-- Pilih Kategori --</option>';
-      dataKategori.forEach(k => {
-        selectKat.innerHTML += `<option value="${k.nama}">${k.nama}</option>`;
-      });
+      if (selectKat) {
+        selectKat.innerHTML = '<option value="">-- Pilih Kategori --</option>';
+        allKategori.forEach((k) => {
+          const opt = document.createElement('option');
+          opt.value = k.nama;
+          opt.textContent = k.nama;
+          selectKat.appendChild(opt);
+        });
+      }
 
       renderEmptyPrompt();
       document.getElementById('btnLihatSemua').style.display = 'none';
@@ -186,7 +191,7 @@
     const tglSampai = document.getElementById('tanggalSampai').value;
     const kategori = document.getElementById('kategoriLaporan').value;
 
-    let filtered = allSurat.filter(s => {
+    const filtered = (Array.isArray(allSurat) ? allSurat : []).filter((s) => {
       let matchTgl = true;
       if (tglMulai && s.tanggal < tglMulai) matchTgl = false;
       if (tglSampai && s.tanggal > tglSampai) matchTgl = false;
@@ -204,10 +209,10 @@
   function renderTable(data, limit) {
     const tbody = document.querySelector('.data-table tbody');
     if (!tbody) return;
-    
+
     const isInfinity = limit === Infinity || limit == null;
     const itemsLimit = isInfinity ? data.length : limit;
-    
+
     const showAllBtnContainer = document.getElementById('btnLihatSemua');
     if (showAllBtnContainer) {
       if (data.length <= itemsLimit || isInfinity) {
@@ -216,14 +221,14 @@
         showAllBtnContainer.style.display = 'block';
       }
     }
-    
+
     const items = data.slice(0, itemsLimit);
-    
+
     if (items.length === 0) {
       tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted);">Tidak ada data yang sesuai</td></tr>`;
       return;
     }
-    
+
     tbody.innerHTML = items.map((l, i) => `
       <tr>
         <td>${i + 1}</td>
@@ -243,24 +248,17 @@
     const tglSampai = document.getElementById('tanggalSampai').value;
     const kategori = document.getElementById('kategoriLaporan').value;
 
-    if (!tglMulai || !tglSampai || !kategori) {
-      showToast('Harap isi dari tanggal, sampai tanggal, dan kategori surat', 'warning');
-      return;
-    }
-
-    if (tglMulai > tglSampai) {
+    if (tglMulai && tglSampai && tglMulai > tglSampai) {
       showToast('Tanggal mulai tidak boleh melebihi tanggal akhir', 'warning');
       return;
     }
 
     const filtered = filterDanTampilkanData(5);
-    document.getElementById('btnLihatSemua').style.display = 'none';
-
     if (filtered.length === 0) {
-      showToast('data laporan arsip tidak ada', 'warning');
+      showToast('Data laporan arsip tidak ada', 'warning');
     }
   }
-  
+
   function triggerLihatSemua() {
     document.getElementById('tanggalMulai').value = '';
     document.getElementById('tanggalSampai').value = '';
@@ -268,36 +266,32 @@
     const filtered = filterDanTampilkanData(Infinity);
     document.getElementById('btnLihatSemua').style.display = 'none';
     if (filtered.length === 0) {
-      showToast('data laporan arsip tidak ada', 'warning');
+      showToast('Data laporan arsip tidak ada', 'warning');
     }
+  }
+
+  function buildExportUrl(type) {
+    const params = new URLSearchParams();
+    const tglMulai = document.getElementById('tanggalMulai').value;
+    const tglSampai = document.getElementById('tanggalSampai').value;
+    const kategori = document.getElementById('kategoriLaporan').value;
+
+    if (tglMulai) params.set('start_date', tglMulai);
+    if (tglSampai) params.set('end_date', tglSampai);
+    if (kategori) params.set('kategori', kategori);
+
+    const endpoint = type === 'pdf' ? '/laporan_arsip/export/pdf' : '/laporan_arsip/export/excel';
+    return `${endpoint}?${params.toString()}`;
   }
 
   function exportExcel() {
     showToast('Mengekspor ke Excel...', 'info');
-    const table = document.querySelector('.data-table');
-    const html = table.outerHTML;
-    
-    // Create a complete HTML document for Excel
-    const template = `
-    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-    <head><meta charset="UTF-8"></head>
-    <body>${html}</body>
-    </html>`;
-
-    const blob = new Blob([template], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "laporan_arsip.xls";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    window.location.href = buildExportUrl('excel');
   }
 
   function exportPDF() {
     showToast('Menyiapkan cetak PDF...', 'info');
-    window.print();
+    window.location.href = buildExportUrl('pdf');
   }
 </script>
 </body>

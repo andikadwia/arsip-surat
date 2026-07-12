@@ -211,7 +211,7 @@
           </div>
           <div class="mini-stat-box">
             <div class="ms-lbl">Jumlah Surat Diunduh</div>
-            <div class="ms-val" id="karyStatKategori">...</div>
+            <div class="ms-val" id="karyStatUnduh">...</div>
           </div>
         </div>
       </div>
@@ -360,17 +360,14 @@
         fetch('/api/profile/stats'),
       ]);
       const dataSurat = await resSurat.json();
-      const dataAi    = await resAi.json();
 
       document.getElementById('karyStatSurat').textContent    = dataSurat.length;
       // Jumlah unduh tersimpan di localStorage per user session
       const downloadCount = parseInt(localStorage.getItem('kary_download_count') || '0');
-      document.getElementById('karyStatKategori').textContent = downloadCount;
-      document.getElementById('karyStatAkurasi').textContent  = dataAi.akurasi || '-';
+      document.getElementById('karyStatUnduh').textContent = downloadCount;
     } catch (e) {
       document.getElementById('karyStatSurat').textContent    = '-';
-      document.getElementById('karyStatKategori').textContent = '-';
-      document.getElementById('karyStatAkurasi').textContent  = '-';
+      document.getElementById('karyStatUnduh').textContent = '-';
     }
   }
   loadKaryawanStats();

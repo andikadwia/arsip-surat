@@ -280,11 +280,7 @@
         </div>
 
         <div class="viewer-content">
-          <div class="pdf-placeholder">
-            <i class="fa-solid fa-file-pdf"></i>
-            <h3 id="vFileName">surat_dokumen.pdf</h3>
-            <p>Menampilkan pratinjau dokumen asli DigiSurat...</p>
-          </div>
+          <iframe id="viewerFrame" src="" style="width:100%;height:100%;border:0;background:#fff;"></iframe>
         </div>
       </div>
     </div>
@@ -297,18 +293,10 @@
         <button class="modal-close" onclick="closeModal('uploadSuratModal')">✕</button>
       </div>
 
-      <!-- TAB SELECTOR -->
-      <div style="display:flex;border-bottom:1px solid var(--border);background:#f8fafc;">
-        <button id="tabAiBtn"
-          style="flex:1;padding:12px;border:none;background:transparent;font-weight:700;font-size:0.9rem;color:#2563eb;border-bottom:2px solid #2563eb;cursor:default;">
-          <i class="fa-solid fa-robot"></i> Upload PDF Otomatis (AI)
-        </button>
-      </div>
-
       <!-- TAB AI: Upload PDF Otomatis -->
       <div id="tabAi" style="padding:20px;">
         <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;text-align:center;">
-          Upload file PDF surat — AI akan membaca dan mengisi semua field secara otomatis.
+          AI akan membaca dan mengisi semua field secara otomatis.
         </p>
         <label class="file-upload-area" for="pdfAutoFile" id="pdfDropArea"
           style="border:2px dashed #2563eb;background:#eff6ff;border-radius:10px;padding:32px;text-align:center;cursor:pointer;display:block;">
@@ -349,18 +337,33 @@
             </div>
           </div>
           <div class="form-actions" style="margin-top:16px;">
-            <button class="btn btn-outline" onclick="resetPdfTab()">Ganti File</button>
+            <button class="btn btn-outline" onclick="resetPdfTab()">
+              <i class="fa-solid fa-upload"></i> Unggah Ulang
+            </button>
             <button class="btn btn-primary" id="pdfSimpanBtn" onclick="submitPdfSurat()">
               <i class="fa-solid fa-save"></i> Simpan ke Arsip
             </button>
           </div>
         </div>
 
-        <!-- Fallback: PDF scan -->
+        <!-- Fallback: PDF tidak terbaca -->
         <div id="pdfFallback" style="display:none;text-align:center;padding:16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;margin-top:16px;">
           <i class="fa-solid fa-triangle-exclamation" style="color:#ea580c;font-size:1.2rem;"></i>
           <p style="font-weight:600;color:#c2410c;margin:8px 0 4px;">PDF tidak bisa dibaca otomatis</p>
-          <p style="font-size:0.82rem;color:#9a3412;">Pastikan PDF yang diupload bukan hasil scan dan memiliki teks yang bisa dibaca.</p>
+          <p style="font-size:0.82rem;color:#9a3412;">Pastikan Tesseract OCR terpasang untuk PDF scan, atau gunakan PDF dengan teks yang bisa dibaca.</p>
+          <button class="btn btn-outline" style="margin-top:12px;" onclick="resetPdfTab()">
+            <i class="fa-solid fa-upload"></i> Unggah Ulang
+          </button>
+        </div>
+
+        <!-- Selesai: berhasil arsip atau auto-save -->
+        <div id="pdfUploadDone" style="display:none;text-align:center;padding:24px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;margin-top:16px;">
+          <i class="fa-solid fa-circle-check" style="color:#16a34a;font-size:2rem;"></i>
+          <p id="pdfDoneMessage" style="font-weight:600;color:#15803d;margin:12px 0 4px;">Surat berhasil diarsipkan!</p>
+          <p id="pdfDoneDetail" style="font-size:0.82rem;color:#166534;margin-bottom:16px;"></p>
+          <button class="btn btn-upload" onclick="resetPdfTab()">
+            <i class="fa-solid fa-upload"></i> Unggah Surat Lain
+          </button>
         </div>
       </div>
 
@@ -449,13 +452,43 @@
 
     let showingAll = false;
     let currentSuratList = [];
+    let activeSuratId = null;
 
-    // Fetch data dari API
+    async function loadKategoriOptions() {
+      try {
+        const res = await fetch('/api/kategori');
+        const list = await res.json();
+        const filterSelect = document.getElementById('kategoriFilter');
+        if (filterSelect) {
+          filterSelect.innerHTML = '<option value="">Semua Kategori</option>';
+          list.forEach((k) => {
+            const opt = document.createElement('option');
+            opt.value = k.nama;
+            opt.textContent = k.nama;
+            filterSelect.appendChild(opt);
+          });
+        }
+
+        const editSelect = document.getElementById('editKategori');
+        if (editSelect) {
+          editSelect.innerHTML = '';
+          list.forEach((k) => {
+            const opt = document.createElement('option');
+            opt.value = k.nama;
+            opt.textContent = k.nama;
+            editSelect.appendChild(opt);
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     async function fetchSurat(limit) {
       try {
         const response = await fetch('/api/surat');
         const data = await response.json();
-        currentSuratList = data;
+        currentSuratList = Array.isArray(data) ? data : [];
         renderLocalTable(limit);
       } catch (e) {
         console.error(e);
@@ -463,25 +496,22 @@
       }
     }
 
-    // Render tabel secara lokal
     function renderLocalTable(limit) {
       const tbody = document.getElementById('suratTableBody');
       if (!tbody) return;
 
-      // Filter juga bisa diterapkan di sini jika ada pencarian aktif
       const q = document.getElementById('searchInput').value.toLowerCase();
       const kat = document.getElementById('kategoriFilter').value.toLowerCase();
 
-      let filtered = currentSuratList.filter(l => {
-        const text = Object.values(l).join(' ').toLowerCase();
+      const filtered = currentSuratList.filter((l) => {
+        const text = `${l.nomor || ''} ${l.tanggal || ''} ${l.pengirim || ''} ${l.perihal || ''} ${l.kategori || ''}`.toLowerCase();
         const matchQ = text.includes(q);
-        const matchKat = !kat || l.kategori.toLowerCase().includes(kat);
+        const matchKat = !kat || (l.kategori || '').toLowerCase().includes(kat);
         return matchQ && matchKat;
       });
 
       const isInfinity = limit === Infinity || limit == null;
       const itemsLimit = isInfinity ? filtered.length : limit;
-
       const showAllBtnContainer = document.getElementById('lihatSemuaContainer');
       if (showAllBtnContainer) {
         if (filtered.length <= itemsLimit || isInfinity) {
@@ -492,37 +522,33 @@
       }
 
       const letters = filtered.slice(0, itemsLimit);
-
       if (letters.length === 0) {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted);"><i class="fa-solid fa-inbox" style="font-size:1.5rem;display:block;margin-bottom:8px;"></i>Belum ada data surat</td></tr>`;
         return;
       }
 
       tbody.innerHTML = letters.map((l, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td style="font-size:0.83rem;">${l.nomor}</td>
-        <td>${l.tanggal}</td>
-        <td style="font-size:0.83rem;">${l.pengirim}</td>
-        <td style="font-size:0.83rem;">${l.perihal}</td>
-        <td><span class="badge-info">${l.kategori}</span></td>
-        <td style="font-size:0.83rem;color:var(--accent);"><i class="fa-regular fa-file-pdf"></i> ${l.file}</td>
-        <td style="white-space:nowrap;">
-          <button class="action-btn btn-edit" title="Edit" onclick="openEditSurat(${l.id})">
-            <i class="fa-solid fa-pen-to-square"></i>
-          </button>
-          <button class="action-btn btn-delete" title="Hapus" onclick="openDeleteSurat(${l.id})" style="margin-left:4px;">
-            <i class="fa-solid fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-    `).join('');
-
-      applyViewerMode();
+        <tr>
+          <td>${i + 1}</td>
+          <td style="font-size:0.83rem;">${l.nomor}</td>
+          <td>${l.tanggal}</td>
+          <td style="font-size:0.83rem;">${l.pengirim}</td>
+          <td style="font-size:0.83rem;">${l.perihal}</td>
+          <td><span class="badge-info">${l.kategori}</span></td>
+          <td style="font-size:0.83rem;color:var(--accent);">
+            <a href="/api/surat/view/${l.id}" target="_blank" rel="noopener"><i class="fa-regular fa-file-pdf"></i> Lihat File</a>
+          </td>
+          <td style="white-space:nowrap;">
+            <button class="action-btn btn-edit" title="Edit" onclick="openEditSurat(${l.id})">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button class="action-btn btn-delete" title="Hapus" onclick="openDeleteSurat(${l.id})" style="margin-left:4px;">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('');
     }
-
-    // Panggil fetch awal
-    fetchSurat(5);
 
     function filterSurat() {
       renderLocalTable(showingAll ? Infinity : 5);
@@ -531,22 +557,13 @@
     function showAllSurat(e) {
       e.preventDefault();
       if (!showingAll) {
-        showToast('Menampilkan semua arsip surat...', 'info');
         showingAll = true;
         document.getElementById('lihatSemuaContainer').style.display = 'none';
         renderLocalTable(Infinity);
+        showToast('Menampilkan semua arsip surat...', 'info');
       }
     }
 
-    function onFileSelect(input) {
-      if (input.files[0]) {
-        document.getElementById('uploadFileName').textContent = input.files[0].name;
-      }
-    }
-
-    // ── Tab Switch dihapus, hanya mode AI ──
-
-    // ── Tab AI: Pilih PDF → kirim ke backend → tampilkan preview ──
     let pdfExtracted = null;
 
     async function onPdfAutoSelect(input) {
@@ -558,6 +575,7 @@
       document.getElementById('pdfAnalyzing').style.display = 'block';
       document.getElementById('pdfPreview').style.display = 'none';
       document.getElementById('pdfFallback').style.display = 'none';
+      document.getElementById('pdfUploadDone').style.display = 'none';
 
       const formData = new FormData();
       formData.append('file', file);
@@ -575,14 +593,18 @@
           return;
         }
 
-        // Simpan hasil ke state
         pdfExtracted = data;
 
-        // Isi preview fields
-        document.getElementById('pdfNomor').value    = data.nomor    || '';
-        document.getElementById('pdfTanggal').value  = data.tanggal  || '';
+        if (data.saved) {
+          showPdfUploadDone(data.save_message || 'Surat berhasil diarsipkan otomatis!', data.kategori ? `Kategori: ${data.kategori}` : '');
+          fetchSurat(showingAll ? Infinity : 5);
+          return;
+        }
+
+        document.getElementById('pdfNomor').value = data.nomor || '';
+        document.getElementById('pdfTanggal').value = data.tanggal || '';
         document.getElementById('pdfPengirim').value = data.pengirim || '';
-        document.getElementById('pdfPerihal').value  = data.perihal  || '';
+        document.getElementById('pdfPerihal').value = data.perihal || '';
         document.getElementById('pdfKategori').value = data.kategori
           ? `${data.kategori}${data.confidence ? ' (' + data.confidence + '%)' : ''} — ${data.model}`
           : 'Model belum dilatih';
@@ -592,6 +614,10 @@
           : 'AI membaca surat — kategori tidak terdeteksi (model belum dilatih)';
         document.getElementById('pdfAiLabel').innerHTML = lbl;
 
+        if (data.save_message) {
+          showToast(data.save_message, 'error');
+        }
+
         document.getElementById('pdfPreview').style.display = 'block';
       } catch (e) {
         document.getElementById('pdfAnalyzing').style.display = 'none';
@@ -599,13 +625,22 @@
       }
     }
 
+    function showPdfUploadDone(message, detail) {
+      document.getElementById('pdfDropArea').style.display = 'none';
+      document.getElementById('pdfPreview').style.display = 'none';
+      document.getElementById('pdfFallback').style.display = 'none';
+      document.getElementById('pdfAnalyzing').style.display = 'none';
+      document.getElementById('pdfDoneMessage').textContent = message;
+      document.getElementById('pdfDoneDetail').textContent = detail || '';
+      document.getElementById('pdfUploadDone').style.display = 'block';
+    }
+
     async function submitPdfSurat() {
-      const nomor    = document.getElementById('pdfNomor').value.trim();
-      const tanggal  = document.getElementById('pdfTanggal').value;
+      const nomor = document.getElementById('pdfNomor').value.trim();
+      const tanggal = document.getElementById('pdfTanggal').value;
       const pengirim = document.getElementById('pdfPengirim').value.trim();
-      const perihal  = document.getElementById('pdfPerihal').value.trim();
+      const perihal = document.getElementById('pdfPerihal').value.trim();
       const kategori = pdfExtracted?.kategori || '';
-      const file     = pdfExtracted?.file || 'surat.pdf';
 
       if (!nomor) { showToast('Nomor surat belum terdeteksi — isi manual!', 'error'); return; }
       if (!pengirim) { showToast('Pengirim belum terdeteksi — isi manual!', 'error'); return; }
@@ -620,15 +655,13 @@
         const response = await fetch('/api/surat/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nomor, tanggal, pengirim, perihal, kategori, file }),
+          body: JSON.stringify({ nomor, tanggal, pengirim, perihal, kategori, file: pdfExtracted?.file || 'surat.pdf' }),
         });
         const res = await response.json();
         if (res.status === 'success') {
-          closeModal('uploadSuratModal');
+          showPdfUploadDone('Surat berhasil diarsipkan!', `Kategori: ${kategori}`);
           showToast(`Surat berhasil diarsipkan! Kategori: ${kategori}`, 'success');
           fetchSurat(showingAll ? Infinity : 5);
-          notifySuratChanged();
-          resetPdfTab();
         } else {
           showToast(res.message || 'Gagal menyimpan', 'error');
         }
@@ -643,178 +676,21 @@
     function resetPdfTab() {
       pdfExtracted = null;
       document.getElementById('pdfAutoFile').value = '';
-      document.getElementById('pdfAutoFileName').textContent = 'Klik atau drag-drop file PDF di sini';
+      document.getElementById('pdfAutoFileName').textContent = 'Klik file PDF di sini';
       document.getElementById('pdfDropArea').style.display = 'block';
       document.getElementById('pdfPreview').style.display = 'none';
       document.getElementById('pdfFallback').style.display = 'none';
+      document.getElementById('pdfUploadDone').style.display = 'none';
+      document.getElementById('pdfAnalyzing').style.display = 'none';
     }
 
-    let aiClassifyTimer = null;
-    let lastAiSuggestion = null;
-
-    // Load kategori dari database saat modal dibuka
-    async function loadKategoriOptions() {
-      try {
-        const res = await fetch('/api/kategori');
-        const list = await res.json();
-        const select = document.getElementById('uploadKategori');
-        select.innerHTML = '<option value="">-- AI akan mendeteksi otomatis --</option>';
-        list.forEach(k => {
-          const opt = document.createElement('option');
-          opt.value = k.nama;
-          opt.textContent = k.nama;
-          select.appendChild(opt);
-        });
-      } catch (e) { /* abaikan */ }
-    }
-
-    function scheduleAiClassify() {
-      const box = document.getElementById('aiSuggestBox');
-      const textEl = document.getElementById('aiSuggestText');
-      box.className = 'ai-suggest-box analyzing';
-      textEl.innerHTML = `<i class="fa-solid fa-robot"></i> AI menganalisis<span class="ai-analyzing-dots"><span>.</span><span>.</span><span>.</span></span>`;
-
-      clearTimeout(aiClassifyTimer);
-      aiClassifyTimer = setTimeout(runAiClassify, 700);
-    }
-
-    async function runAiClassify() {
-      const perihal = document.getElementById('uploadPerihal').value.trim();
-      const pengirim = document.getElementById('uploadPengirim').value.trim();
-      const box = document.getElementById('aiSuggestBox');
-      const textEl = document.getElementById('aiSuggestText');
-
-      if (!perihal) {
-        box.className = 'ai-suggest-box';
-        lastAiSuggestion = null;
-        document.getElementById('uploadKategori').value = '';
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/ai/classify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ perihal, pengirim }),
-        });
-        const data = await res.json();
-        if (data.status === 'success') {
-          lastAiSuggestion = data.kategori;
-          const conf = data.confidence ? ` ${data.confidence}%` : '';
-          const model = data.model_display || '';
-
-          // Otomatis isi dropdown kategori
-          const select = document.getElementById('uploadKategori');
-          const opts = Array.from(select.options).map(o => o.value);
-          if (opts.includes(data.kategori)) {
-            select.value = data.kategori;
-          } else {
-            // Tambah opsi baru jika belum ada
-            const opt = document.createElement('option');
-            opt.value = data.kategori;
-            opt.textContent = data.kategori;
-            select.appendChild(opt);
-            select.value = data.kategori;
-          }
-
-          // Tampilkan status di suggestion box (bukan tombol, langsung applied)
-          box.className = 'ai-suggest-box applied';
-          textEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> AI: <strong>${data.kategori}</strong>${conf} &mdash; <span style="font-weight:400;font-size:0.8rem;">${model}</span>`;
-        } else {
-          box.className = 'ai-suggest-box visible';
-          textEl.innerHTML = `<i class="fa-solid fa-robot"></i> AI: Model belum dilatih &mdash; pilih kategori manual`;
-          lastAiSuggestion = null;
-        }
-      } catch (e) {
-        box.className = 'ai-suggest-box';
-        lastAiSuggestion = null;
-      }
-    }
-
-    // Override openModal untuk load kategori saat modal upload dibuka
-    const _origOpenModal = typeof openModal === 'function' ? openModal : null;
     function openUploadModal() {
       openModal('uploadSuratModal');
-      // Default: buka Tab AI
-      switchUploadTab('ai');
       resetPdfTab();
-      // Reset AI manual box
-      const box = document.getElementById('aiSuggestBox');
-      if (box) box.className = 'ai-suggest-box';
-      lastAiSuggestion = null;
-    }
-
-    async function submitUploadSurat() {
-      const nomor = document.getElementById('uploadNomor').value.trim();
-      const tanggal = document.getElementById('uploadTanggal').value;
-      const pengirim = document.getElementById('uploadPengirim').value.trim();
-      const perihal = document.getElementById('uploadPerihal').value.trim();
-      let kategori = document.getElementById('uploadKategori').value;
-      const fileInput = document.getElementById('uploadFile');
-
-      if (!nomor || !tanggal || !pengirim || !perihal) {
-        showToast('Harap isi semua field yang diperlukan!', 'error'); return;
-      }
-
-      // Jika kategori belum dipilih, coba ambil dari saran AI
-      if (!kategori) {
-        if (lastAiSuggestion) {
-          kategori = lastAiSuggestion;
-        } else {
-          try {
-            const res = await fetch('/api/ai/classify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ perihal, pengirim }),
-            });
-            const data = await res.json();
-            if (data.status === 'success') kategori = data.kategori;
-          } catch (e) { /* abaikan */ }
-        }
-      }
-
-      if (!kategori) {
-        showToast('Pilih kategori atau latih model AI terlebih dahulu!', 'error'); return;
-      }
-
-      const fileName = fileInput.files[0] ? fileInput.files[0].name : 'surat_baru.pdf';
-
-      // Simpan ke database via API
-      try {
-        const response = await fetch('/api/surat/add', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nomor, tanggal, pengirim, perihal, kategori, file: fileName })
-        });
-        const res = await response.json();
-        if (res.status === 'success') {
-          closeModal('uploadSuratModal');
-          showToast(`Surat berhasil diunggah! Kategori: ${kategori}`, 'success');
-          fetchSurat(showingAll ? Infinity : 5);
-          notifySuratChanged();
-        } else {
-          showToast(res.message || 'Gagal menyimpan surat', 'error');
-          return;
-        }
-      } catch (e) {
-        showToast('Terjadi kesalahan saat menyimpan surat', 'error');
-        return;
-      }
-
-      // Reset form
-      document.getElementById('uploadNomor').value = '';
-      document.getElementById('uploadTanggal').value = '';
-      document.getElementById('uploadPengirim').value = '';
-      document.getElementById('uploadPerihal').value = '';
-      document.getElementById('uploadKategori').value = '';
-      document.getElementById('uploadFileName').textContent = 'Klik untuk pilih file atau drag & drop disini';
-      document.getElementById('aiSuggestBox').classList.remove('visible');
-      lastAiSuggestion = null;
-      fileInput.value = '';
     }
 
     function openEditSurat(id) {
-      const letter = currentSuratList.find(l => l.id === id);
+      const letter = currentSuratList.find((l) => l.id === id);
       if (!letter) return;
       document.getElementById('editSuratId').value = id;
       document.getElementById('editNomor').value = letter.nomor;
@@ -826,30 +702,28 @@
     }
 
     async function submitEditSurat() {
-      const id = parseInt(document.getElementById('editSuratId').value);
+      const id = parseInt(document.getElementById('editSuratId').value, 10);
       const nomor = document.getElementById('editNomor').value.trim();
       const tanggal = document.getElementById('editTanggal').value;
       const pengirim = document.getElementById('editPengirim').value.trim();
       const perihal = document.getElementById('editPerihal').value.trim();
       const kategori = document.getElementById('editKategori').value;
       if (!nomor || !tanggal || !pengirim || !perihal || !kategori) {
-        showToast('Harap isi semua field!', 'error'); return;
+        showToast('Harap isi semua field!', 'error');
+        return;
       }
-
-      const updatedLetter = { nomor, tanggal, pengirim, perihal, kategori };
 
       try {
         const response = await fetch('/api/surat/edit/' + id, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedLetter)
+          body: JSON.stringify({ nomor, tanggal, pengirim, perihal, kategori })
         });
         const res = await response.json();
         if (res.status === 'success') {
           closeModal('editSuratModal');
           showToast('Surat berhasil diperbarui!', 'success');
           fetchSurat(showingAll ? Infinity : 5);
-          notifySuratChanged();
         } else {
           showToast(res.message, 'error');
         }
@@ -864,7 +738,7 @@
     }
 
     async function confirmDeleteSurat() {
-      const id = parseInt(document.getElementById('deleteSuratId').value);
+      const id = parseInt(document.getElementById('deleteSuratId').value, 10);
       try {
         const response = await fetch('/api/surat/delete/' + id, {
           method: 'DELETE'
@@ -874,7 +748,6 @@
           closeModal('deleteSuratModal');
           showToast('Surat berhasil dihapus!', 'success');
           fetchSurat(showingAll ? Infinity : 5);
-          notifySuratChanged();
         } else {
           showToast(res.message, 'error');
         }
@@ -884,58 +757,27 @@
     }
 
     function openDocumentViewer(id) {
-      const letter = currentSuratList.find(l => l.id === id);
+      const letter = currentSuratList.find((l) => l.id === id);
       if (!letter) return;
 
+      activeSuratId = id;
       document.getElementById('vNomor').textContent = letter.nomor;
       document.getElementById('vPengirim').textContent = letter.pengirim;
       document.getElementById('vTanggal').textContent = letter.tanggal;
       document.getElementById('vKategori').textContent = letter.kategori;
-      document.getElementById('vFileName').textContent = letter.file;
-
+      document.getElementById('vFileName').textContent = letter.file_path || 'surat.pdf';
+      document.getElementById('viewerFrame').src = `/api/surat/view/${id}`;
       openModal('documentViewerModal');
     }
 
     function handleDownload() {
-      const fileName = document.getElementById('vFileName').textContent;
-      showToast(`Berhasil mengunduh: ${fileName}`, 'success');
+      if (activeSuratId) {
+        window.open(`/api/surat/download/${activeSuratId}`, '_blank');
+      }
     }
 
-    function applyViewerMode() {
-      const rows = document.querySelectorAll('#suratTableBody tr');
-      rows.forEach(row => {
-        const actionTd = row.querySelector('td:last-child');
-        if (actionTd && !actionTd.querySelector('.btn-action-detail')) {
-          const editBtn = actionTd.querySelector('button[onclick^="openEditSurat"]');
-          if (editBtn) {
-            const idMatch = editBtn.getAttribute('onclick').match(/\\d+/);
-            if (idMatch) {
-              const id = idMatch[0];
-              const detailBtn = document.createElement('button');
-              detailBtn.className = 'btn-action-detail';
-              detailBtn.innerHTML = '<i class="fa-solid fa-file-contract"></i> Detail';
-              detailBtn.setAttribute('onclick', `openDocumentViewer(${id})`);
-              actionTd.appendChild(detailBtn);
-            }
-          }
-        }
-
-        const fileTd = row.querySelector('td:nth-last-child(2) i');
-        if (fileTd && !fileTd.parentElement.hasAttribute('data-viewer-linked')) {
-          const editBtn = row.querySelector('button[onclick^="openEditSurat"]');
-          if (editBtn) {
-            const idMatch = editBtn.getAttribute('onclick').match(/\\d+/);
-            if (idMatch) {
-              const fileContainer = fileTd.parentElement;
-              fileContainer.style.cursor = 'pointer';
-              fileContainer.setAttribute('onclick', `openDocumentViewer(${idMatch[0]})`);
-              fileContainer.setAttribute('data-viewer-linked', 'true');
-            }
-          }
-        }
-      });
-    }
-
+    loadKategoriOptions();
+    fetchSurat(5);
   </script>
 </body>
 

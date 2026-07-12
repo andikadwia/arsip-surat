@@ -1,29 +1,29 @@
 {
   "trained": true,
-  "last_trained": "14 June 2026, 13:51",
+  "last_trained": "04 July 2026, 16:30",
   "total_samples": 150,
   "config": {
     "vectorizer": "tfidf",
-    "knn_k": 5,
+    "knn_k": 14,
     "knn_metric": "euclidean",
-    "nb_alpha": 1.0,
+    "nb_alpha": 0.5,
     "active_param": "preprocessing"
   },
   "metrics": {
-    "naive_bayes": {
-      "accuracy": 0.8333,
-      "precision": 0.8604,
-      "recall": 0.8333,
-      "f1": 0.8379
-    },
     "knn": {
-      "accuracy": 0.7,
-      "precision": 0.7103,
-      "recall": 0.7,
-      "f1": 0.685
+      "accuracy": 0.8667,
+      "precision": 0.8778,
+      "recall": 0.8667,
+      "f1": 0.866
+    },
+    "naive_bayes": {
+      "accuracy": 0.8667,
+      "precision": 0.8864,
+      "recall": 0.8667,
+      "f1": 0.8647
     }
   },
-  "best_model": "naive_bayes",
+  "best_model": "knn",
   "labels": [
     "Keputusan",
     "Pemberitahuan",
@@ -33,5 +33,6 @@
   "last_trained_target": [
     "knn",
     "naive_bayes"
-  ]
+  ],
+  "last_prediction_confidence": 78.6
 }

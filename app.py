@@ -3,15 +3,48 @@ from flask_login import LoginManager, login_user, login_required, logout_user, c
 from models import db, User, Kategori, Surat, AktivitasLog # Import database dari models.py
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import or_
+from openpyxl import Workbook
+from io import BytesIO
+from datetime import datetime
 import ai_engine
 import os
+from dotenv import load_dotenv
+
+# Load konfigurasi dari file .env
+load_dotenv()
+
+# ── Import ReportLab untuk generate PDF ──────────────────────────────────────
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import HRFlowable
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'rahasia_digisurat_2026' # Wajib ada untuk flash message/session
 
-# Konfigurasi Database (SQLite)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///digisurat.db'
+# ── Konfigurasi Database MySQL (dari file .env) ───────────────────────────────
+_DB_HOST = os.getenv('DB_HOST', 'localhost')
+_DB_PORT = os.getenv('DB_PORT', '3306')
+_DB_USER = os.getenv('DB_USER', 'root')
+_DB_PASSWORD = os.getenv('DB_PASSWORD', '')
+_DB_NAME = os.getenv('DB_NAME', 'arsip_surat')
+
+app.config['SQLALCHEMY_DATABASE_URI'] = (
+    f'mysql+pymysql://{_DB_USER}:{_DB_PASSWORD}@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}'
+    '?charset=utf8mb4'
+)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_recycle': 280,
+    'pool_pre_ping': True,
+}
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
+
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Hubungkan app dengan database
 db.init_app(app)
@@ -140,7 +173,9 @@ def dashboard_admin():
 def manajemen_surat():
     if current_user.role != 'Admin':
         return redirect(url_for('dashboard_karyawan'))
-    return render_template("manajemen_surat.html")
+    surat_list = Surat.query.order_by(Surat.created_at.desc()).all()
+    kategori_list = Kategori.query.order_by(Kategori.nama.asc()).all()
+    return render_template("manajemen_surat.html", surat_list=surat_list, kategori_list=kategori_list)
 
 @app.route("/kategori_surat")
 @login_required
@@ -154,7 +189,43 @@ def kategori_surat():
 def laporan_arsip():
     if current_user.role != 'Admin':
         return redirect(url_for('dashboard_karyawan'))
-    return render_template("laporan_arsip.html")
+
+    kategori_filter = (request.args.get('kategori') or '').strip()
+    start_date = (request.args.get('start_date') or '').strip()
+    end_date = (request.args.get('end_date') or '').strip()
+    keyword = (request.args.get('keyword') or '').strip()
+
+    query = Surat.query
+    if kategori_filter:
+        query = query.join(Kategori).filter(Kategori.nama == kategori_filter)
+    if start_date:
+        query = query.filter(Surat.tanggal_surat >= datetime.strptime(start_date, '%Y-%m-%d').date())
+    if end_date:
+        query = query.filter(Surat.tanggal_surat <= datetime.strptime(end_date, '%Y-%m-%d').date())
+    if keyword:
+        like_value = f'%{keyword}%'
+        query = query.filter(
+            or_(
+                Surat.nomor_surat.ilike(like_value),
+                Surat.pengirim.ilike(like_value),
+                Surat.perihal.ilike(like_value),
+            )
+        )
+
+    surat_list = query.order_by(Surat.tanggal_surat.desc(), Surat.created_at.desc()).all()
+    kategori_list = Kategori.query.order_by(Kategori.nama.asc()).all()
+    return render_template(
+        'laporan_arsip.html',
+        surat_list=surat_list,
+        kategori_list=kategori_list,
+        filters={
+            'kategori': kategori_filter,
+            'start_date': start_date,
+            'end_date': end_date,
+            'keyword': keyword,
+        },
+        total_count=len(surat_list),
+    )
 
 @app.route("/manajemen_user")
 @login_required
@@ -354,21 +425,169 @@ def delete_aktivitas_api():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ======================
-# API MANAJEMEN SURAT (CRUD KE MYSQL)
+# API MANAJEMEN SURAT (CRUD)
 # ======================
 
 def _normalize_surat_file_path(file_value):
     if not file_value:
         return 'static/uploads/surat_baru.pdf'
     file_value = str(file_value).replace('\\', '/').strip()
+    if not file_value:
+        return 'static/uploads/surat_baru.pdf'
     if file_value.startswith('static/uploads/'):
         return file_value
+    if file_value.startswith('/'):
+        return os.path.relpath(file_value, app.root_path).replace('\\', '/')
     return f'static/uploads/{os.path.basename(file_value)}'
+
+
+def _ensure_upload_dir():
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+
+def _save_uploaded_surat_file(uploaded_file):
+    if not uploaded_file or not getattr(uploaded_file, 'filename', None):
+        return _normalize_surat_file_path(None)
+
+    _ensure_upload_dir()
+    filename = secure_filename(uploaded_file.filename)
+    if not filename:
+        return _normalize_surat_file_path(None)
+
+    name, ext = os.path.splitext(filename)
+    if not ext:
+        ext = '.pdf'
+
+    unique_filename = f"surat_{datetime.now().strftime('%Y%m%d%H%M%S')}_{name}{ext}"
+    save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+    uploaded_file.save(save_path)
+    return os.path.relpath(save_path, app.root_path).replace('\\', '/')
+
+
+def _delete_surat_file(file_path):
+    try:
+        normalized = _normalize_surat_file_path(file_path)
+        if not normalized.startswith('static/uploads/'):
+            return
+        abs_path = os.path.join(app.root_path, *normalized.split('/'))
+        if os.path.exists(abs_path):
+            os.remove(abs_path)
+    except Exception:
+        pass
+
+
+def _get_or_create_kategori(kategori_nama):
+    kategori_name = (kategori_nama or 'Umum').strip() or 'Umum'
+    kat = Kategori.query.filter_by(nama=kategori_name).first()
+    if not kat:
+        kat = Kategori(nama=kategori_name)
+        db.session.add(kat)
+        db.session.commit()
+    return kat
+
+
+def _save_surat_from_fields(data, user_id=None):
+    return _create_surat_from_payload(data, user_id=user_id, file_storage=None)
+
+
+def _create_surat_from_payload(data, user_id=None, file_storage=None):
+    nomor = (data.get('nomor') or '').strip()
+    pengirim = (data.get('pengirim') or '').strip()
+    perihal = (data.get('perihal') or '').strip()
+    kategori_nama = (data.get('kategori') or 'Umum').strip() or 'Umum'
+
+    if not nomor or not pengirim or not perihal:
+        return {'saved': False, 'message': 'Nomor, pengirim, dan perihal wajib diisi.'}
+
+    tanggal_str = (data.get('tanggal') or '').strip()
+    if tanggal_str:
+        try:
+            tgl_obj = datetime.strptime(tanggal_str, '%Y-%m-%d').date()
+        except ValueError:
+            tgl_obj = datetime.now().date()
+    else:
+        tgl_obj = datetime.now().date()
+
+    if Surat.query.filter_by(nomor_surat=nomor).first():
+        return {'saved': False, 'message': f'Nomor surat {nomor} sudah ada di arsip.'}
+
+    kat = _get_or_create_kategori(kategori_nama)
+    file_path = _save_uploaded_surat_file(file_storage) if file_storage else _normalize_surat_file_path(data.get('file') or data.get('file_path'))
+    if not file_path:
+        file_path = 'static/uploads/surat_baru.pdf'
+
+    surat = Surat(
+        nomor_surat=nomor,
+        tanggal_surat=tgl_obj,
+        pengirim=pengirim,
+        perihal=perihal,
+        file_path=file_path,
+        kategori_id=kat.id,
+    )
+    db.session.add(surat)
+    db.session.commit()
+
+    if user_id:
+        log_aktivitas(user_id, f'Menambahkan surat: {nomor}', 'Selesai')
+
+    return {
+        'saved': True,
+        'message': 'Surat berhasil diarsipkan.',
+        'surat_id': surat.id,
+        'kategori': kategori_nama,
+    }
+
+
+def _update_surat_from_payload(surat, data, user_id=None, file_storage=None):
+    nomor = (data.get('nomor') or '').strip()
+    pengirim = (data.get('pengirim') or '').strip()
+    perihal = (data.get('perihal') or '').strip()
+    kategori_nama = (data.get('kategori') or 'Umum').strip() or 'Umum'
+
+    if not nomor or not pengirim or not perihal:
+        return {'saved': False, 'message': 'Nomor, pengirim, dan perihal wajib diisi.'}
+
+    tanggal_str = (data.get('tanggal') or '').strip()
+    if tanggal_str:
+        try:
+            tgl_obj = datetime.strptime(tanggal_str, '%Y-%m-%d').date()
+        except ValueError:
+            tgl_obj = datetime.now().date()
+    else:
+        tgl_obj = datetime.now().date()
+
+    existing_nomor = Surat.query.filter(Surat.nomor_surat == nomor, Surat.id != surat.id).first()
+    if existing_nomor:
+        return {'saved': False, 'message': f'Nomor surat {nomor} sudah ada di arsip.'}
+
+    kat = _get_or_create_kategori(kategori_nama)
+    file_path = surat.file_path
+    if file_storage is not None and getattr(file_storage, 'filename', None):
+        if surat.file_path and surat.file_path != 'static/uploads/surat_baru.pdf':
+            _delete_surat_file(surat.file_path)
+        file_path = _save_uploaded_surat_file(file_storage)
+    elif data.get('file_path'):
+        file_path = _normalize_surat_file_path(data.get('file_path'))
+    elif data.get('file'):
+        file_path = _normalize_surat_file_path(data.get('file'))
+
+    surat.nomor_surat = nomor
+    surat.tanggal_surat = tgl_obj
+    surat.pengirim = pengirim
+    surat.perihal = perihal
+    surat.kategori_id = kat.id
+    surat.file_path = file_path
+    db.session.commit()
+
+    if user_id:
+        log_aktivitas(user_id, f'Mengubah surat: {nomor}', 'Selesai')
+
+    return {'saved': True, 'message': 'Surat berhasil diperbarui.'}
 
 
 def _send_surat_file(surat, as_attachment=False):
     file_path = _normalize_surat_file_path(surat.file_path)
-    abs_path = os.path.join(app.root_path, file_path.replace('/', os.sep))
+    abs_path = os.path.join(app.root_path, *file_path.split('/'))
     if not os.path.isfile(abs_path):
         abort(404, description='File surat tidak ditemukan di server.')
     directory = os.path.dirname(abs_path)
@@ -387,19 +606,91 @@ def _send_surat_file(surat, as_attachment=False):
 
 
 def _serialize_surat(s):
-    kategori_nama = s.kategori_rel.nama if s.kategori_rel else "Lainnya"
+    kategori_nama = s.kategori_rel.nama if s.kategori_rel else 'Lainnya'
     file_path = _normalize_surat_file_path(s.file_path)
     return {
-        "id": s.id,
-        "nomor": s.nomor_surat,
-        "tanggal": s.tanggal_surat.strftime("%Y-%m-%d"),
-        "pengirim": s.pengirim,
-        "perihal": s.perihal,
-        "kategori": kategori_nama,
-        "file": file_path,
-        "file_path": file_path,
-        "created_at": s.created_at.isoformat() if s.created_at else None,
+        'id': s.id,
+        'nomor': s.nomor_surat,
+        'tanggal': s.tanggal_surat.strftime('%Y-%m-%d'),
+        'pengirim': s.pengirim,
+        'perihal': s.perihal,
+        'kategori': kategori_nama,
+        'file': file_path,
+        'file_path': file_path,
+        'created_at': s.created_at.isoformat() if s.created_at else None,
     }
+
+
+@app.route('/letters', methods=['GET'])
+@login_required
+def get_letters_api():
+    if current_user.role != 'Admin':
+        return jsonify({'status': 'error', 'message': 'Akses ditolak.'}), 403
+    surat_list = Surat.query.order_by(Surat.created_at.desc()).all()
+    return jsonify([_serialize_surat(s) for s in surat_list])
+
+
+@app.route('/letters/<int:surat_id>', methods=['GET'])
+@login_required
+def get_letter_detail_api(surat_id):
+    surat = Surat.query.get_or_404(surat_id)
+    return jsonify(_serialize_surat(surat))
+
+
+@app.route('/letters', methods=['POST'])
+@login_required
+def create_letter_api():
+    if current_user.role != 'Admin':
+        return jsonify({'status': 'error', 'message': 'Akses ditolak.'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    if not payload and request.form:
+        payload = request.form.to_dict()
+
+    file_storage = request.files.get('file') if request.files else None
+    result = _create_surat_from_payload(payload, user_id=current_user.id, file_storage=file_storage)
+    if result['saved']:
+        flash('Surat berhasil disimpan.', 'success')
+        return jsonify({'status': 'success', 'message': result['message']})
+    flash(result['message'], 'error')
+    return jsonify({'status': 'error', 'message': result['message']})
+
+
+@app.route('/letters/<int:surat_id>', methods=['PATCH', 'PUT'])
+@login_required
+def update_letter_api(surat_id):
+    if current_user.role != 'Admin':
+        return jsonify({'status': 'error', 'message': 'Akses ditolak.'}), 403
+
+    surat = Surat.query.get_or_404(surat_id)
+    payload = request.get_json(silent=True) or {}
+    if not payload and request.form:
+        payload = request.form.to_dict()
+
+    file_storage = request.files.get('file') if request.files else None
+    result = _update_surat_from_payload(surat, payload, user_id=current_user.id, file_storage=file_storage)
+    if result['saved']:
+        flash('Surat berhasil diperbarui.', 'success')
+        return jsonify({'status': 'success', 'message': result['message']})
+    flash(result['message'], 'error')
+    return jsonify({'status': 'error', 'message': result['message']})
+
+
+@app.route('/letters/<int:surat_id>', methods=['DELETE'])
+@login_required
+def delete_letter_api(surat_id):
+    if current_user.role != 'Admin':
+        return jsonify({'status': 'error', 'message': 'Akses ditolak.'}), 403
+
+    surat = Surat.query.get_or_404(surat_id)
+    nomor_surat = surat.nomor_surat
+    if surat.file_path:
+        _delete_surat_file(surat.file_path)
+    db.session.delete(surat)
+    db.session.commit()
+    log_aktivitas(current_user.id, f'Menghapus surat: {nomor_surat}', 'Selesai')
+    flash('Surat berhasil dihapus.', 'success')
+    return jsonify({'status': 'success', 'message': 'Surat berhasil dihapus.'})
 
 
 @app.route("/api/surat", methods=["GET"])
@@ -423,63 +714,33 @@ def surat_sync_api():
 @app.route("/api/surat/add", methods=["POST"])
 @login_required
 def add_surat_api():
-    data = request.json
+    payload = request.get_json(silent=True) or {}
+    if not payload and request.form:
+        payload = request.form.to_dict()
+    file_storage = request.files.get('file') if request.files else None
     try:
-        kategori_nama = data.get('kategori', 'Umum')
-        kat = Kategori.query.filter_by(nama=kategori_nama).first()
-        if not kat:
-            kat = Kategori(nama=kategori_nama)
-            db.session.add(kat)
-            db.session.commit()
-            
-        tgl_str = data['tanggal'] # expected YYYY-MM-DD
-        from datetime import datetime
-        tgl_obj = datetime.strptime(tgl_str, '%Y-%m-%d').date()
-
-        new_surat = Surat(
-            nomor_surat=data['nomor'],
-            tanggal_surat=tgl_obj,
-            pengirim=data['pengirim'],
-            perihal=data['perihal'],
-            file_path=_normalize_surat_file_path(data.get('file', 'surat_baru.pdf')),
-            kategori_id=kat.id
-        )
-        db.session.add(new_surat)
-        db.session.commit()
-        log_aktivitas(current_user.id, f"Menambahkan surat: {data['nomor']}", "Selesai")
-        return jsonify({"status": "success", "message": "Surat berhasil ditambah"})
+        result = _create_surat_from_payload(payload, user_id=current_user.id, file_storage=file_storage)
+        if result['saved']:
+            return jsonify({"status": "success", "message": result['message']})
+        return jsonify({"status": "error", "message": result['message']})
     except Exception as e:
+        db.session.rollback()
         return jsonify({"status": "error", "message": str(e)})
 
-@app.route("/api/surat/edit/<int:id>", methods=["PUT"])
+@app.route("/api/surat/edit/<int:id>", methods=["PUT", "PATCH"])
 @login_required
 def edit_surat_api(id):
-    data = request.json
     surat = Surat.query.get(id)
     if surat:
         try:
-            kategori_nama = data.get('kategori', 'Umum')
-            kat = Kategori.query.filter_by(nama=kategori_nama).first()
-            if not kat:
-                kat = Kategori(nama=kategori_nama)
-                db.session.add(kat)
-                db.session.commit()
-            
-            tgl_str = data['tanggal']
-            from datetime import datetime
-            tgl_obj = datetime.strptime(tgl_str, '%Y-%m-%d').date()
-
-            surat.nomor_surat = data['nomor']
-            surat.tanggal_surat = tgl_obj
-            surat.pengirim = data['pengirim']
-            surat.perihal = data['perihal']
-            surat.kategori_id = kat.id
-            if 'file' in data and data['file']:
-                surat.file_path = _normalize_surat_file_path(data['file'])
-            
-            db.session.commit()
-            log_aktivitas(current_user.id, f"Mengubah surat: {data['nomor']}", "Selesai")
-            return jsonify({"status": "success", "message": "Surat berhasil diperbarui"})
+            payload = request.get_json(silent=True) or {}
+            if not payload and request.form:
+                payload = request.form.to_dict()
+            file_storage = request.files.get('file') if request.files else None
+            result = _update_surat_from_payload(surat, payload, user_id=current_user.id, file_storage=file_storage)
+            if result['saved']:
+                return jsonify({"status": "success", "message": result['message']})
+            return jsonify({"status": "error", "message": result['message']})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})
     return jsonify({"status": "error", "message": "Surat tidak ditemukan"})
@@ -490,6 +751,8 @@ def delete_surat_api(id):
     surat = Surat.query.get(id)
     if surat:
         nomor_surat = surat.nomor_surat
+        if surat.file_path:
+            _delete_surat_file(surat.file_path)
         db.session.delete(surat)
         db.session.commit()
         log_aktivitas(current_user.id, f"Menghapus surat: {nomor_surat}", "Selesai")
@@ -511,6 +774,261 @@ def download_surat_file(id):
     """Unduh file PDF surat."""
     surat = Surat.query.get_or_404(id)
     return _send_surat_file(surat, as_attachment=True)
+
+
+@app.route('/laporan_arsip/export/excel')
+@login_required
+def export_laporan_excel():
+    if current_user.role != 'Admin':
+        return redirect(url_for('dashboard_karyawan'))
+
+    query = Surat.query
+    kategori_filter = (request.args.get('kategori') or '').strip()
+    start_date = (request.args.get('start_date') or '').strip()
+    end_date = (request.args.get('end_date') or '').strip()
+    keyword = (request.args.get('keyword') or '').strip()
+
+    if kategori_filter:
+        query = query.join(Kategori).filter(Kategori.nama == kategori_filter)
+    if start_date:
+        query = query.filter(Surat.tanggal_surat >= datetime.strptime(start_date, '%Y-%m-%d').date())
+    if end_date:
+        query = query.filter(Surat.tanggal_surat <= datetime.strptime(end_date, '%Y-%m-%d').date())
+    if keyword:
+        like_value = f'%{keyword}%'
+        query = query.filter(or_(Surat.nomor_surat.ilike(like_value), Surat.pengirim.ilike(like_value), Surat.perihal.ilike(like_value)))
+
+    surat_list = query.order_by(Surat.tanggal_surat.desc(), Surat.created_at.desc()).all()
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = 'Laporan Arsip'
+    sheet.append(['Nomor Surat', 'Tanggal', 'Pengirim', 'Perihal', 'Kategori'])
+    for surat in surat_list:
+        sheet.append([surat.nomor_surat, surat.tanggal_surat.strftime('%Y-%m-%d'), surat.pengirim, surat.perihal, surat.kategori_rel.nama if surat.kategori_rel else 'Lainnya'])
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    response.headers['Content-Disposition'] = 'attachment; filename=laporan_arsip.xlsx'
+    return response
+
+
+@app.route('/laporan_arsip/export/pdf')
+@login_required
+def export_laporan_pdf():
+    if current_user.role != 'Admin':
+        return redirect(url_for('dashboard_karyawan'))
+
+    # ── Ambil filter dari query string ────────────────────────────────────────
+    query = Surat.query
+    kategori_filter = (request.args.get('kategori') or '').strip()
+    start_date_str   = (request.args.get('start_date') or '').strip()
+    end_date_str     = (request.args.get('end_date') or '').strip()
+    keyword          = (request.args.get('keyword') or '').strip()
+
+    if kategori_filter:
+        query = query.join(Kategori).filter(Kategori.nama == kategori_filter)
+    if start_date_str:
+        query = query.filter(Surat.tanggal_surat >= datetime.strptime(start_date_str, '%Y-%m-%d').date())
+    if end_date_str:
+        query = query.filter(Surat.tanggal_surat <= datetime.strptime(end_date_str, '%Y-%m-%d').date())
+    if keyword:
+        like_val = f'%{keyword}%'
+        query = query.filter(or_(
+            Surat.nomor_surat.ilike(like_val),
+            Surat.pengirim.ilike(like_val),
+            Surat.perihal.ilike(like_val),
+        ))
+
+    surat_list = query.order_by(Surat.tanggal_surat.desc(), Surat.created_at.desc()).all()
+
+    # ── Generate PDF dengan ReportLab ────────────────────────────────────────
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=1.5 * cm,
+        rightMargin=1.5 * cm,
+        topMargin=1.5 * cm,
+        bottomMargin=1.5 * cm,
+    )
+
+    # ── Warna & Style ─────────────────────────────────────────────────────────
+    COLOR_HEADER_BG  = colors.HexColor('#1e3a5f')   # biru tua
+    COLOR_HEADER_FG  = colors.white
+    COLOR_ROW_ALT    = colors.HexColor('#f0f4fa')   # biru muda untuk baris genap
+    COLOR_ACCENT     = colors.HexColor('#3b82f6')   # biru aksen
+    COLOR_TEXT       = colors.HexColor('#1f2937')
+    COLOR_MUTED      = colors.HexColor('#6b7280')
+    COLOR_BORDER     = colors.HexColor('#d1d5db')
+
+    styles = getSampleStyleSheet()
+    style_title = ParagraphStyle(
+        'Title',
+        parent=styles['Title'],
+        fontSize=18,
+        textColor=COLOR_HEADER_BG,
+        spaceAfter=4,
+        fontName='Helvetica-Bold',
+        alignment=TA_CENTER,
+    )
+    style_subtitle = ParagraphStyle(
+        'Subtitle',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=COLOR_MUTED,
+        spaceAfter=2,
+        alignment=TA_CENTER,
+    )
+    style_info = ParagraphStyle(
+        'Info',
+        parent=styles['Normal'],
+        fontSize=8.5,
+        textColor=COLOR_TEXT,
+        spaceAfter=2,
+    )
+    style_cell = ParagraphStyle(
+        'Cell',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=COLOR_TEXT,
+        leading=11,
+    )
+    style_cell_center = ParagraphStyle(
+        'CellCenter',
+        parent=style_cell,
+        alignment=TA_CENTER,
+    )
+
+    story = []
+
+    # ── Header Laporan ────────────────────────────────────────────────────────
+    story.append(Paragraph('LAPORAN ARSIP SURAT', style_title))
+    story.append(Paragraph('Sistem Manajemen Arsip Digital — DigiSurat', style_subtitle))
+    story.append(Spacer(1, 6))
+    story.append(HRFlowable(width='100%', thickness=2, color=COLOR_ACCENT, spaceAfter=6))
+
+    # ── Info filter & metadata ────────────────────────────────────────────────
+    cetak_waktu = datetime.now().strftime('%d %B %Y, %H:%M WIB')
+    filter_parts = []
+    if kategori_filter:
+        filter_parts.append(f'Kategori: {kategori_filter}')
+    if start_date_str:
+        filter_parts.append(f'Dari: {datetime.strptime(start_date_str, "%Y-%m-%d").strftime("%d %b %Y")}')
+    if end_date_str:
+        filter_parts.append(f'Sampai: {datetime.strptime(end_date_str, "%Y-%m-%d").strftime("%d %b %Y")}')
+    if keyword:
+        filter_parts.append(f'Kata Kunci: {keyword}')
+    filter_text = ' | '.join(filter_parts) if filter_parts else 'Semua Data'
+
+    meta_data = [
+        [Paragraph(f'<b>Dicetak pada:</b> {cetak_waktu}', style_info),
+         Paragraph(f'<b>Filter:</b> {filter_text}', style_info),
+         Paragraph(f'<b>Total Data:</b> {len(surat_list)} surat', style_info)],
+    ]
+    meta_table = Table(meta_data, colWidths=['35%', '40%', '25%'])
+    meta_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+        ('BOX', (0, 0), (-1, -1), 0.5, COLOR_BORDER),
+        ('ROWPADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(meta_table)
+    story.append(Spacer(1, 12))
+
+    # ── Baris Header Tabel ────────────────────────────────────────────────────
+    table_header = [
+        Paragraph('<b>No</b>', style_cell_center),
+        Paragraph('<b>Nomor Surat</b>', style_cell_center),
+        Paragraph('<b>Tanggal Surat</b>', style_cell_center),
+        Paragraph('<b>Pengirim</b>', style_cell_center),
+        Paragraph('<b>Perihal</b>', style_cell_center),
+        Paragraph('<b>Kategori</b>', style_cell_center),
+    ]
+
+    # ── Baris Data Tabel ─────────────────────────────────────────────────────
+    table_data = [table_header]
+    for idx, surat in enumerate(surat_list, start=1):
+        kat_nama = surat.kategori_rel.nama if surat.kategori_rel else 'Lainnya'
+        row = [
+            Paragraph(str(idx), style_cell_center),
+            Paragraph(surat.nomor_surat or '-', style_cell),
+            Paragraph(surat.tanggal_surat.strftime('%d-%m-%Y'), style_cell_center),
+            Paragraph(surat.pengirim or '-', style_cell),
+            Paragraph(surat.perihal or '-', style_cell),
+            Paragraph(kat_nama, style_cell_center),
+        ]
+        table_data.append(row)
+
+    if not surat_list:
+        table_data.append([
+            Paragraph('', style_cell),
+            Paragraph('Tidak ada data yang sesuai dengan filter yang dipilih.', style_cell),
+            Paragraph('', style_cell),
+            Paragraph('', style_cell),
+            Paragraph('', style_cell),
+            Paragraph('', style_cell),
+        ])
+
+    # ── Lebar kolom (total ≈ landscape A4 - margin = ~26 cm) ─────────────────
+    col_widths = [1.2*cm, 5.5*cm, 3.0*cm, 5.5*cm, 8.0*cm, 3.3*cm]
+
+    arsip_table = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+    # ── Style Tabel ───────────────────────────────────────────────────────────
+    tbl_style = TableStyle([
+        # Header
+        ('BACKGROUND',   (0, 0), (-1, 0), COLOR_HEADER_BG),
+        ('TEXTCOLOR',    (0, 0), (-1, 0), COLOR_HEADER_FG),
+        ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',     (0, 0), (-1, 0), 8.5),
+        ('ROWPADDING',   (0, 0), (-1, 0), 8),
+        ('ALIGN',        (0, 0), (-1, 0), 'CENTER'),
+        ('VALIGN',       (0, 0), (-1, 0), 'MIDDLE'),
+        # Data rows
+        ('FONTNAME',     (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE',     (0, 1), (-1, -1), 8),
+        ('ROWPADDING',   (0, 1), (-1, -1), 6),
+        ('VALIGN',       (0, 1), (-1, -1), 'MIDDLE'),
+        # Grid
+        ('GRID',         (0, 0), (-1, -1), 0.5, COLOR_BORDER),
+        ('LINEBELOW',    (0, 0), (-1, 0), 1.5, COLOR_ACCENT),
+    ])
+    # Warna baris zebra (selang-seling)
+    for row_idx in range(1, len(table_data)):
+        if row_idx % 2 == 0:
+            tbl_style.add('BACKGROUND', (0, row_idx), (-1, row_idx), COLOR_ROW_ALT)
+
+    arsip_table.setStyle(tbl_style)
+    story.append(arsip_table)
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    story.append(Spacer(1, 14))
+    story.append(HRFlowable(width='100%', thickness=0.5, color=COLOR_BORDER))
+    story.append(Spacer(1, 4))
+    style_footer = ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=7.5,
+        textColor=COLOR_MUTED,
+        alignment=TA_CENTER,
+    )
+    story.append(Paragraph(
+        f'DigiSurat — Sistem Manajemen Arsip Digital &nbsp;|&nbsp; '
+        f'Dokumen ini digenerate otomatis pada {cetak_waktu} &nbsp;|&nbsp; '
+        f'Total {len(surat_list)} data arsip surat',
+        style_footer,
+    ))
+
+    doc.build(story)
+    buffer.seek(0)
+
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = 'attachment; filename=laporan_arsip.pdf'
+    return response
 
 # ======================
 # API MANAJEMEN KATEGORI
@@ -752,11 +1270,16 @@ def profile_stats():
         elif algo_name == 'KNN':
             algo_name = 'K-NN'
 
+        if 'last_prediction_confidence' in ai_status:
+            akurasi_str = f"{ai_status['last_prediction_confidence']}%"
+        else:
+            akurasi_str = f"{best_acc*100:.0f}%" if ai_status.get('trained') else '-'
+
         return jsonify({
             "total_surat": total_surat,
             "jumlah_kategori": jumlah_kategori,
             "algoritma":   algo_name if ai_status.get('trained') else '-',
-            "akurasi":     f"{best_acc*100:.0f}%" if ai_status.get('trained') else '-',
+            "akurasi":     akurasi_str,
         })
     except Exception as e:
         return jsonify({"total_surat": 0, "jumlah_kategori": 0, "algoritma": "-", "akurasi": "-"})
@@ -788,6 +1311,12 @@ def upload_pdf_api():
 
     # Ekstrak field dari PDF
     fields = ai_engine.extract_pdf_fields(save_path)
+    file_path = _normalize_surat_file_path(filename)
+    
+    if fields.get('confidence'):
+        metadata = ai_engine.load_metadata()
+        metadata['last_prediction_confidence'] = fields['confidence']
+        ai_engine.save_metadata(metadata)
 
     return jsonify({
         "status": "success",
@@ -799,7 +1328,10 @@ def upload_pdf_api():
         "kategori": fields['kategori'],
         "model":    fields['model'],
         "confidence": fields['confidence'],
-        "file":     _normalize_surat_file_path(filename),
+        "file":     file_path,
+        "saved":    False,
+        "save_message": "",
+        "surat_id": None,
     })
 
 

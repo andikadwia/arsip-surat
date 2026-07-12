@@ -15,6 +15,21 @@ try:
 except ImportError:
     _PDF_AVAILABLE = False
 
+try:
+    import pytesseract  # type: ignore
+    from pdf2image import convert_from_path  # type: ignore
+    _OCR_AVAILABLE = True
+    if os.name == 'nt':
+        for _tess_path in (
+            r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+            r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+        ):
+            if os.path.isfile(_tess_path):
+                pytesseract.pytesseract.tesseract_cmd = _tess_path
+                break
+except ImportError:
+    _OCR_AVAILABLE = False
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -527,8 +542,21 @@ def extract_pdf_fields(file_path: str) -> dict:
                 all_lines.extend(page_text.splitlines())
 
         full_text = full_text.strip()
+
+        if not full_text and _OCR_AVAILABLE:
+            try:
+                images = convert_from_path(file_path, first_page=1, last_page=5)
+                ocr_text = ''
+                for img in images:
+                    ocr_text += pytesseract.image_to_string(img, lang='ind') + '\n'
+                full_text = ocr_text.strip()
+                if full_text:
+                    all_lines = full_text.splitlines()
+            except Exception:
+                pass
+
         if not full_text:
-            return result   # PDF scan / tidak terbaca
+            return result
 
         result['readable'] = True
         result['raw_text'] = full_text[:500]
@@ -538,7 +566,6 @@ def extract_pdf_fields(file_path: str) -> dict:
         result['pengirim'] = _parse_pengirim(all_lines)
         result['perihal']  = _parse_perihal(full_text)
 
-        # Klasifikasi AI berdasarkan perihal + pengirim
         text_for_ai = f"{result['pengirim']} {result['perihal']}".strip()
         if text_for_ai:
             ai_result = classify_text(text_for_ai)
