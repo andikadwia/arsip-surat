@@ -244,13 +244,12 @@
       <div class="arsip-panel" style="margin-bottom: 24px;">
         <div class="arsip-panel-title">
           Daftar Arsip Surat Terbaru
-          <span class="live-sync-badge" id="liveSyncBadge"><span class="dot"></span> Live</span>
         </div>
 
         <a href="/manajemen_surat"
           style="text-decoration: none; color: inherit; display: block; background: #fff; transition: background 0.2s;"
           onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
-          <div class="arsip-table-wrap" style="background: transparent;">
+          <div class="arsip-table-wrap" style="background: transparent; overflow-x: auto;">
             <table class="data-table" id="dashboardTable">
               <thead>
                 <tr>
@@ -396,16 +395,16 @@
           tbody.innerHTML = latest.map((l, i) => `
             <tr>
               <td>${i + 1}</td>
-              <td style="font-size:0.83rem;">${l.nomor}</td>
+              <td>${l.nomor}</td>
               <td>${l.tanggal}</td>
-              <td style="font-size:0.83rem;">${l.pengirim}</td>
-              <td style="font-size:0.83rem;">${l.perihal}</td>
+              <td>${l.pengirim}</td>
+              <td>${l.perihal}</td>
               <td><span class="badge-info">${l.kategori}</span></td>
-              <td style="font-size:0.83rem;color:var(--accent);"><i class="fa-regular fa-file-pdf"></i> ${suratFileName(l.file || l.file_path)}</td>
+              <td style="color:var(--accent);"><i class="fa-regular fa-file-pdf"></i> ${suratFileName(l.file || l.file_path)}</td>
             </tr>`).join('');
         }
         document.getElementById('statTotalSurat').textContent = data.length;
-        if (showNotice) showToast('Arsip surat diperbarui', 'info');
+        // Notice removed by user request
       } catch (e) {
         document.getElementById('statTotalSurat').textContent = '-';
       }

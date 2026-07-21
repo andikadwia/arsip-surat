@@ -530,15 +530,15 @@
       tbody.innerHTML = letters.map((l, i) => `
         <tr>
           <td>${i + 1}</td>
-          <td style="font-size:0.83rem;">${l.nomor}</td>
+          <td>${l.nomor}</td>
           <td>${l.tanggal}</td>
-          <td style="font-size:0.83rem;">${l.pengirim}</td>
-          <td style="font-size:0.83rem;">${l.perihal}</td>
+          <td>${l.pengirim}</td>
+          <td>${l.perihal}</td>
           <td><span class="badge-info">${l.kategori}</span></td>
-          <td style="font-size:0.83rem;color:var(--accent);">
+          <td style="color:var(--accent);">
             <a href="/api/surat/view/${l.id}" target="_blank" rel="noopener"><i class="fa-regular fa-file-pdf"></i> Lihat File</a>
           </td>
-          <td style="white-space:nowrap;">
+          <td>
             <button class="action-btn btn-edit" title="Edit" onclick="openEditSurat(${l.id})">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>

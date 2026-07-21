@@ -332,6 +332,7 @@ def get_status():
         'config': metadata.get('config', DEFAULT_CONFIG.copy()),
         'labels': metadata.get('labels', []),
         'dataset_file': metadata.get('dataset_file'),
+        'last_prediction_confidence': metadata.get('last_prediction_confidence'),
     }
 
 
@@ -490,10 +491,10 @@ def _parse_pengirim(lines: list[str]) -> str:
     text_all = '\n'.join(lines)
     m = _RE_DARI.search(text_all)
     if m:
-        return m.group(1).split('\n')[0].strip()[:150]
+        return m.group(1).split('\n')[0].strip().rstrip(',').strip()[:150]
     # Ambil baris non-kosong pertama sebagai kop surat
     for line in lines[:10]:
-        line = line.strip()
+        line = line.strip().rstrip(',').strip()
         if len(line) > 5 and not line.isdigit():
             return line[:150]
     return ''

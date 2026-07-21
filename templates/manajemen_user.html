@@ -23,6 +23,12 @@
     #userTable .action-cell {
       white-space: nowrap;
     }
+    #userTable td:nth-child(5) {
+      text-align: center;
+      white-space: nowrap;
+      min-width: 0;
+      max-width: none;
+    }
     #userTable .action-cell-inner {
       display: inline-flex;
       align-items: center;
@@ -360,11 +366,20 @@
     openModal('resetSandiModal');
   }
 
-  function confirmResetSandi() {
-    // Note: Anda bisa membuat rute API khusus nanti untuk fitur reset password ini.
-    // Saat ini, simulasi toast saja.
-    closeModal('resetSandiModal');
-    showToast('Kata sandi berhasil di-reset ke default!', 'success');
+  async function confirmResetSandi() {
+    const id = document.getElementById('resetUserId').value;
+    try {
+      const response = await fetch(`/api/users/reset_password/${id}`, { method: 'PUT' });
+      const res = await response.json();
+      if (res.status === 'success') {
+        closeModal('resetSandiModal');
+        showToast(res.message, 'success');
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch (e) {
+      showToast('Gagal mereset sandi', 'error');
+    }
   }
 
   // FUNGSI DELETE

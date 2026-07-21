@@ -334,6 +334,20 @@ def edit_user_api(id):
             return jsonify({"status": "error", "message": str(e)})
     return jsonify({"status": "error", "message": "User tidak ditemukan"})
 
+@app.route("/api/users/reset_password/<int:id>", methods=["PUT"])
+@login_required
+def reset_password(id):
+    user = User.query.get(id)
+    if user:
+        try:
+            user.password = generate_password_hash('digisurat123')
+            db.session.commit()
+            log_aktivitas(current_user.id, f"Mereset password user: {user.nama}", "Selesai")
+            return jsonify({"status": "success", "message": "Kata sandi berhasil di-reset ke default!"})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)})
+    return jsonify({"status": "error", "message": "User tidak ditemukan"})
+
 @app.route("/api/users/delete/<int:id>", methods=["DELETE"])
 @login_required
 def delete_user_api(id):
@@ -492,7 +506,7 @@ def _save_surat_from_fields(data, user_id=None):
 
 def _create_surat_from_payload(data, user_id=None, file_storage=None):
     nomor = (data.get('nomor') or '').strip()
-    pengirim = (data.get('pengirim') or '').strip()
+    pengirim = (data.get('pengirim') or '').strip().rstrip(',').strip()
     perihal = (data.get('perihal') or '').strip()
     kategori_nama = (data.get('kategori') or 'Umum').strip() or 'Umum'
 
@@ -540,7 +554,7 @@ def _create_surat_from_payload(data, user_id=None, file_storage=None):
 
 def _update_surat_from_payload(surat, data, user_id=None, file_storage=None):
     nomor = (data.get('nomor') or '').strip()
-    pengirim = (data.get('pengirim') or '').strip()
+    pengirim = (data.get('pengirim') or '').strip().rstrip(',').strip()
     perihal = (data.get('perihal') or '').strip()
     kategori_nama = (data.get('kategori') or 'Umum').strip() or 'Umum'
 
@@ -1260,7 +1274,7 @@ def profile_stats():
     try:
         total_surat = Surat.query.count()
         jumlah_kategori = Kategori.query.count()
-        ai_status   = ai_engine.get_ai_status()
+        ai_status   = ai_engine.get_status()
         nb  = (ai_status.get('metrics') or {}).get('naive_bayes', {})
         knn = (ai_status.get('metrics') or {}).get('knn', {})
         best_acc  = max(nb.get('accuracy', 0), knn.get('accuracy', 0))
@@ -1270,7 +1284,7 @@ def profile_stats():
         elif algo_name == 'KNN':
             algo_name = 'K-NN'
 
-        if 'last_prediction_confidence' in ai_status:
+        if ai_status.get('last_prediction_confidence') is not None:
             akurasi_str = f"{ai_status['last_prediction_confidence']}%"
         else:
             akurasi_str = f"{best_acc*100:.0f}%" if ai_status.get('trained') else '-'

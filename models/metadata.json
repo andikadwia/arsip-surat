@@ -1,6 +1,6 @@
 {
   "trained": true,
-  "last_trained": "04 July 2026, 16:30",
+  "last_trained": "21 July 2026, 19:27",
   "total_samples": 150,
   "config": {
     "vectorizer": "tfidf",
@@ -25,14 +25,13 @@
   },
   "best_model": "knn",
   "labels": [
-    "Keputusan",
-    "Pemberitahuan",
-    "Undangan"
+    "Surat Keputusan",
+    "Surat Pemberitahuan",
+    "Surat Undangan"
   ],
-  "dataset_file": "training_dataset_150.csv",
+  "dataset_file": "dataset.csv",
   "last_trained_target": [
     "knn",
     "naive_bayes"
-  ],
-  "last_prediction_confidence": 78.6
+  ]
 }

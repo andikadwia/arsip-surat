@@ -68,6 +68,87 @@
       .btn-save-global { margin-top: 0; width: 100%; }
       .train-box { width: 100%; }
     }
+
+    /* ======= TRAINING LOADING MODAL ======= */
+    #trainingModal .modal {
+      text-align: center;
+      padding: 40px 32px;
+    }
+    .train-spinner {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 5px solid #dbeafe;
+      border-top-color: #2563eb;
+      animation: spin 0.9s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .train-modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 8px;
+    }
+    .train-modal-subtitle {
+      font-size: 0.86rem;
+      color: #64748b;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    .train-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .train-step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.84rem;
+      color: #94a3b8;
+      transition: color 0.3s;
+    }
+    .train-step.active {
+      color: #1e40af;
+      font-weight: 600;
+    }
+    .train-step.done {
+      color: #16a34a;
+    }
+    .train-step-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      flex-shrink: 0;
+      transition: background 0.3s, color 0.3s;
+      color: #94a3b8;
+    }
+    .train-step.active .train-step-icon {
+      background: #dbeafe;
+      color: #2563eb;
+      animation: pulse-icon 1s ease-in-out infinite;
+    }
+    .train-step.done .train-step-icon {
+      background: #dcfce7;
+      color: #16a34a;
+    }
+    @keyframes pulse-icon {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
   </style>
 </head>
 <body>
@@ -194,6 +275,40 @@
     <div class="form-actions" style="justify-content:center;">
       <button class="btn btn-outline" onclick="closeModal('logoutModal')">Batal</button>
       <button class="btn btn-danger" onclick="confirmLogout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Training Loading Modal -->
+<div class="modal-overlay" id="trainingModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="train-spinner" id="trainSpinner"></div>
+    <div class="train-modal-title" id="trainModalTitle">Melatih Model AI...</div>
+    <div class="train-modal-subtitle" id="trainModalSubtitle">
+      Proses pelatihan sedang berjalan.<br>Mohon tunggu dan jangan tutup halaman ini.
+    </div>
+    <div class="train-steps">
+      <div class="train-step" id="step1">
+        <div class="train-step-icon"><i class="fa-solid fa-upload"></i></div>
+        <span>Membaca &amp; memvalidasi dataset</span>
+      </div>
+      <div class="train-step" id="step2">
+        <div class="train-step-icon"><i class="fa-solid fa-broom"></i></div>
+        <span>Pre-processing teks (tokenisasi, stopword)</span>
+      </div>
+      <div class="train-step" id="step3">
+        <div class="train-step-icon"><i class="fa-solid fa-table-cells"></i></div>
+        <span>Ekstraksi fitur TF-IDF</span>
+      </div>
+      <div class="train-step" id="step4">
+        <div class="train-step-icon"><i class="fa-solid fa-brain"></i></div>
+        <span>Melatih model Naive Bayes &amp; K-NN</span>
+      </div>
+      <div class="train-step" id="step5">
+        <div class="train-step-icon"><i class="fa-solid fa-chart-line"></i></div>
+        <span>Evaluasi &amp; menyimpan model</span>
+      </div>
     </div>
   </div>
 </div>
@@ -327,7 +442,34 @@
     const trainLabel = currentActiveParam === 'preprocessing'
       ? 'Pre-Processing (Naive Bayes & K-NN)'
       : PARAM_LABELS[currentActiveParam];
-    showToast(`Memulai pelatihan parameter: ${trainLabel}...`, 'info');
+
+    // Tampilkan loading modal
+    openModal('trainingModal');
+    const steps = ['step1','step2','step3','step4','step5'];
+    steps.forEach(s => {
+      const el = document.getElementById(s);
+      el.classList.remove('active','done');
+    });
+
+    // Animasi langkah-langkah training
+    let stepIndex = 0;
+    function activateStep(idx) {
+      if (idx > 0) {
+        document.getElementById(steps[idx - 1]).classList.remove('active');
+        document.getElementById(steps[idx - 1]).classList.add('done');
+        document.getElementById(steps[idx - 1]).querySelector('.train-step-icon').innerHTML = '<i class="fa-solid fa-check"></i>';
+      }
+      if (idx < steps.length) {
+        document.getElementById(steps[idx]).classList.add('active');
+      }
+    }
+    activateStep(0);
+    const stepInterval = setInterval(() => {
+      stepIndex++;
+      if (stepIndex < steps.length) {
+        activateStep(stepIndex);
+      }
+    }, 700);
 
     const formData = new FormData();
     formData.append('dataset', fileInput.files[0]);
@@ -336,18 +478,50 @@
     try {
       const res = await fetch('/api/ai/train', { method: 'POST', body: formData });
       const data = await res.json();
+      clearInterval(stepInterval);
+
       if (data.status === 'success') {
+        // Tandai semua langkah selesai
+        steps.forEach(s => {
+          const el = document.getElementById(s);
+          el.classList.remove('active');
+          el.classList.add('done');
+          el.querySelector('.train-step-icon').innerHTML = '<i class="fa-solid fa-check"></i>';
+        });
+        document.getElementById('trainModalTitle').textContent = 'Pelatihan Selesai!';
+        document.getElementById('trainModalSubtitle').innerHTML = `<span style="color:#16a34a;font-weight:600;"><i class="fa-solid fa-circle-check"></i> ${data.message || 'Model berhasil dilatih.'}</span>`;
+        document.getElementById('trainSpinner').style.background = 'none';
+        document.getElementById('trainSpinner').style.border = 'none';
+        document.getElementById('trainSpinner').style.animation = 'none';
+        document.getElementById('trainSpinner').innerHTML = '<i class="fa-solid fa-circle-check" style="font-size:3rem;color:#16a34a;"></i>';
         const best = data.best_model === 'knn' ? 'K-NN' : (data.best_model === 'naive_bayes' ? 'Naive Bayes' : '-');
-        showToast(`${data.message} Model terbaik saat ini: ${best}.`, 'success');
+        showToast(`${data.message} Model terbaik: ${best}.`, 'success');
         fileInput.value = '';
         await loadAiStatus();
+        setTimeout(() => closeModal('trainingModal'), 2000);
       } else {
+        closeModal('trainingModal');
         showToast(data.message || 'Pelatihan gagal', 'error');
       }
     } catch (e) {
+      clearInterval(stepInterval);
+      closeModal('trainingModal');
       showToast('Terjadi kesalahan saat pelatihan', 'error');
     } finally {
       btn.disabled = false;
+      // Reset modal state untuk penggunaan berikutnya
+      setTimeout(() => {
+        document.getElementById('trainSpinner').style = '';
+        document.getElementById('trainSpinner').innerHTML = '';
+        document.getElementById('trainModalTitle').textContent = 'Melatih Model AI...';
+        document.getElementById('trainModalSubtitle').innerHTML = 'Proses pelatihan sedang berjalan.<br>Mohon tunggu dan jangan tutup halaman ini.';
+        steps.forEach(s => {
+          const el = document.getElementById(s);
+          el.classList.remove('active','done');
+          const icons = ['fa-upload','fa-broom','fa-table-cells','fa-brain','fa-chart-line'];
+          el.querySelector('.train-step-icon').innerHTML = `<i class="fa-solid ${icons[steps.indexOf(s)]}"></i>`;
+        });
+      }, 2500);
     }
   }
 

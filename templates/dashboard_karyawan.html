@@ -190,8 +190,7 @@
 
     <div class="arsip-panel">
       <div class="arsip-panel-title">
-        Daftar Surat Arsip
-        <span class="live-sync-badge"><span class="dot"></span> Live</span>
+        Daftar Arsip Surat Terbaru
       </div>
       <div class="arsip-table-wrap">
         <table class="data-table" id="karyawanTable">
@@ -268,6 +267,22 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="unduhSemuaModal">
+  <div class="modal" style="max-width:380px;">
+    <div class="confirm-icon" style="background:rgba(52, 152, 219, 0.1); color:var(--primary-color);"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+    <div class="confirm-text">
+      <h3>Unduh Semua Surat?</h3>
+      <p>Apakah Anda yakin ingin mengunduh semua surat? Proses ini mungkin memerlukan beberapa saat.</p>
+    </div>
+    <div class="form-actions" style="justify-content:center;">
+      <button class="btn btn-outline" onclick="closeModal('unduhSemuaModal')">Batal</button>
+      <button class="btn btn-primary" onclick="executeDownloadAll()">
+        <i class="fa-solid fa-download"></i> Unduh
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="../static/app.js"></script>
@@ -305,7 +320,7 @@
       }
 
       renderTableKaryawan(showingAll ? null : 5);
-      if (showNotice) showToast('Daftar surat diperbarui', 'info');
+        // Notice removed by user request
     } catch (e) {
       console.error(e);
       showToast('Gagal memuat data dashboard', 'error');
@@ -395,9 +410,12 @@
       showToast('Belum ada surat yang dapat diunduh', 'error');
       return;
     }
-    // Konfirmasi sebelum unduh semua
-    if (!confirm('Apakah Anda yakin mengunduh semua surat?')) return;
+    // Tampilkan modal konfirmasi
+    openModal('unduhSemuaModal');
+  }
 
+  function executeDownloadAll() {
+    closeModal('unduhSemuaModal');
     let count = 0;
     allSurat.forEach((surat, idx) => {
       const filePath = surat.file || surat.file_path;

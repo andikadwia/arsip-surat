@@ -225,7 +225,7 @@
       <tr>
         <td>${i + 1}</td>
         <td style="font-weight:600;">${k.nama}</td>
-        <td style="font-size:0.85rem;color:var(--text-secondary);">${k.deskripsi || '–'}</td>
+        <td style="font-size:0.85rem;color:var(--text-secondary);white-space:normal;max-width:350px;line-height:1.4;word-break:break-word;text-align:left;">${k.deskripsi || '–'}</td>
         <td style="white-space:nowrap;">
           <button class="action-btn btn-edit" title="Edit" onclick="openEditKategori(${k.id})">
             <i class="fa-solid fa-pen-to-square"></i>
