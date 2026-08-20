@@ -33,5 +33,6 @@
   "last_trained_target": [
     "knn",
     "naive_bayes"
-  ]
+  ],
+  "last_prediction_confidence": 57.1
 }
