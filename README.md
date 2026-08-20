@@ -28,6 +28,20 @@ To log in:
 
 If the login fails, check the username and password and make sure that Caps Lock is not active.
 
+## Demo Account
+
+The following accounts can be used to access DigiSurat:
+
+### Admin Account
+
+Username: `admin@polibatam.ac.id`
+Password: `admin123`
+
+### Employee Account
+
+Username: `karyawan@polibatam.ac.id`
+Password: `karyawan123`
+
 ## Admin
 
 After logging in as Admin, the system displays the Admin Dashboard. The dashboard provides an overview of the letters and users stored in the system.
